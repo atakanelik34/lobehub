@@ -100,16 +100,23 @@ export const createWorkToolService = (context: ToolExecutionContext): WorkToolSe
   const resolveGallery = async (
     items: { caption?: string; image: string }[],
     coverImage?: string,
-  ) => ({
-    ...(coverImage ? { coverFileId: parseGalleryImageRef(coverImage) } : {}),
-    items: await resolveAgentWorkGalleryItems({
+  ) => {
+    const resolved = await resolveAgentWorkGalleryItems({
       db,
       items,
       userId,
       visitorTopicId: agentShareVisitor ? topicId : undefined,
       workspaceId,
-    }),
-  });
+    });
+    // The cover names one of the items the same way; map it to that item's
+    // file. A cover outside the list stays as named and is refused as such.
+    const coverRef = coverImage ? parseGalleryImageRef(coverImage) : undefined;
+    const coverIndex = coverRef
+      ? items.findIndex(({ image }) => parseGalleryImageRef(image) === coverRef)
+      : -1;
+    const coverFileId = coverIndex >= 0 ? resolved[coverIndex].fileId : coverRef;
+    return { ...(coverFileId ? { coverFileId } : {}), items: resolved };
+  };
 
   return {
     create: guarded(async (args) => {

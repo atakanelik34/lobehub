@@ -10,11 +10,14 @@ const workId = {
 
 const items = {
   description:
-    'Gallery images in display order. Each image is a file id (file_…) or the /f/file_… link the image generation tool returned.',
+    'Gallery images in display order. Each image is the generationId (gen_…) an image generation result lists, or a file id (file_…) or /f/file_… link.',
   items: {
     properties: {
       caption: { description: 'Short caption shown with the image.', type: 'string' },
-      image: { description: 'File id or /f/file_… link of the image.', type: 'string' },
+      image: {
+        description: 'generationId (gen_…), file id (file_…) or /f/file_… link of the image.',
+        type: 'string',
+      },
     },
     required: ['image'],
     type: 'object',

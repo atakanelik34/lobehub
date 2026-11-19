@@ -12,7 +12,7 @@ export type WorkApiNameType = (typeof WorkApiName)[keyof typeof WorkApiName];
 /** One gallery image as the model names it. */
 export interface WorkImageArg {
   caption?: string;
-  /** A file id (`file_…`) or the `/f/file_…` link image generation returns. */
+  /** A `generationId` (`gen_…`) from image generation, a file id (`file_…`) or a `/f/file_…` link. */
   image: string;
 }
 

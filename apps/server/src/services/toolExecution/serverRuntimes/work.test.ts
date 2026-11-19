@@ -238,6 +238,25 @@ describe('workRuntime', () => {
     expect(JSON.stringify(accessScope)).toContain('topic');
   });
 
+  it('maps a cover named by generationId to that image file', async () => {
+    mocks.resolveGallery.mockResolvedValueOnce([
+      { fileId: 'file_a', mimeType: 'image/png', url: 'https://app.example.com/f/file_a' },
+      { fileId: 'file_b', mimeType: 'image/png', url: 'https://app.example.com/f/file_b' },
+    ]);
+
+    await workRuntime.factory(context).createWork({
+      coverImage: 'gen_2',
+      items: [{ image: 'gen_1' }, { image: 'gen_2' }],
+      title: 'Cats',
+      type: 'gallery',
+    });
+
+    expect(mocks.createAgentWork).toHaveBeenCalledWith(
+      run,
+      expect.objectContaining({ coverFileId: 'file_b' }),
+    );
+  });
+
   it("checks a share visitor's gallery images against the visitor conversation", async () => {
     await workRuntime
       .factory({

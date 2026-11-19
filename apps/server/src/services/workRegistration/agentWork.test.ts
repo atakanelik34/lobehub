@@ -273,6 +273,32 @@ describe('resolveAgentWorkGalleryItems', () => {
     );
   });
 
+  it('resolves the generationId an image generation result lists to its file', async () => {
+    mocks.findFile.mockResolvedValue(generatedImage);
+    mocks.fileAccessUrl.mockResolvedValue('https://app.example.com/f/file_img');
+
+    await expect(
+      resolveAgentWorkGalleryItems({
+        db: dbWith({ fileId: 'file_img' }),
+        items: [{ image: 'gen_cat1' }],
+        userId: 'user_1',
+      }),
+    ).resolves.toEqual([
+      { fileId: 'file_img', mimeType: 'image/png', url: 'https://app.example.com/f/file_img' },
+    ]);
+    expect(mocks.findFile).toHaveBeenCalledWith('file_img');
+
+    // Another user's generation, or one that has no stored image yet.
+    await expectStatus(
+      resolveAgentWorkGalleryItems({
+        db: dbWith(undefined),
+        items: [{ image: 'gen_other' }],
+        userId: 'user_1',
+      }),
+      404,
+    );
+  });
+
   it("keeps a share visitor's gallery to images shown in that conversation", async () => {
     mocks.findFile.mockResolvedValue(generatedImage);
     mocks.fileAccessUrl.mockResolvedValue('https://app.example.com/f/file_img');

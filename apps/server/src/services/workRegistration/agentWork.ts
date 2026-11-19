@@ -5,7 +5,7 @@ import { and, eq, or, sql } from 'drizzle-orm';
 import { FileModel } from '@/database/models/file';
 import { WorkModel } from '@/database/models/work';
 import { hasActiveWorkspaceMembership } from '@/database/models/workspace';
-import { agentOperations, messages } from '@/database/schemas';
+import { agentOperations, generations, messages } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
 import type { HeteroOperationJwtClaims } from '@/libs/trpc/utils/internalJwt';
 import { FileService } from '@/server/services/file';
@@ -163,8 +163,8 @@ export const resolveAgentWorkFile = async (params: {
 const GALLERY_IMAGE_SOURCES = new Set<string>([FileSource.ImageGeneration, FileSource.ToolResult]);
 
 /**
- * The file id an agent names a gallery image by: a bare `file_…` id, or the
- * `/f/<id>` link image generation returns (`![…](https://…/f/file_…)`).
+ * The id an agent names a gallery image by: the `generationId` (`gen_…`) an
+ * image generation result lists, a bare `file_…` id, or a `/f/<id>` file link.
  */
 export const parseGalleryImageRef = (ref: string): string => {
   const value = ref.trim();
@@ -177,6 +177,8 @@ export const parseGalleryImageRef = (ref: string): string => {
   }
   throw new AgentWorkRunError(`${value} is not a LobeHub file link (/f/<file id>)`, 404);
 };
+
+const isGenerationId = (id: string) => id.startsWith('gen_');
 
 /**
  * Resolve the images of a gallery to stored image entries. Each must be an
@@ -201,7 +203,18 @@ export const resolveAgentWorkGalleryItems = async (params: {
 
   const files = await Promise.all(
     items.map(async ({ caption, image }) => {
-      const fileId = parseGalleryImageRef(image);
+      const ref = parseGalleryImageRef(image);
+      let fileId = ref;
+      if (isGenerationId(ref)) {
+        // Image generation results name the generation; its stored image is the file.
+        const [generation] = await db
+          .select({ fileId: generations.fileId })
+          .from(generations)
+          .where(and(eq(generations.id, ref), eq(generations.userId, userId)))
+          .limit(1);
+        if (!generation?.fileId) throw new AgentWorkRunError(`Image ${image} not found`, 404);
+        fileId = generation.fileId;
+      }
       const file = await fileModel.findById(fileId);
       if (!file || file.userId !== userId || !GALLERY_IMAGE_SOURCES.has(file.source ?? '')) {
         throw new AgentWorkRunError(`Image ${image} not found`, 404);
@@ -209,14 +222,15 @@ export const resolveAgentWorkGalleryItems = async (params: {
       if (!file.fileType.startsWith('image/')) {
         throw new AgentWorkRunError(`File ${fileId} is not an image`, 409);
       }
-      return { caption, file, image };
+      return { caption, file, image, ref };
     }),
   );
 
   if (visitorTopicId) {
     // Generated images live in generation topics; the conversation only holds
-    // their `/f/<id>` link in the tool result that produced them. One scan of
-    // the topic returns the messages naming any of the images.
+    // the id the agent names them by (the generation id or file link) in the
+    // tool result that produced them. One scan of the topic returns the
+    // messages naming any of the images.
     const shown = await db
       .select({ content: messages.content })
       .from(messages)
@@ -224,12 +238,10 @@ export const resolveAgentWorkGalleryItems = async (params: {
         and(
           eq(messages.topicId, visitorTopicId),
           eq(messages.userId, userId),
-          or(...files.map(({ file }) => sql`position(${file.id} in ${messages.content}) > 0`)),
+          or(...files.map(({ ref }) => sql`position(${ref} in ${messages.content}) > 0`)),
         ),
       );
-    const missing = files.find(
-      ({ file }) => !shown.some(({ content }) => content?.includes(file.id)),
-    );
+    const missing = files.find(({ ref }) => !shown.some(({ content }) => content?.includes(ref)));
     if (missing) throw new AgentWorkRunError(`Image ${missing.image} not found`, 404);
   }
 
