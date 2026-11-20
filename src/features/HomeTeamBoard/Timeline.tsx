@@ -237,7 +237,7 @@ const Bar = ({
         title,
         t(`team.status.${run.status}`),
         duration,
-        member?.fullName || member?.username,
+        member?.nickname || member?.fullName || member?.username,
         run.model,
       ]
         .filter(Boolean)
