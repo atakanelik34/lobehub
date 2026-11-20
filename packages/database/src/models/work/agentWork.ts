@@ -11,6 +11,9 @@ import type {
 import { AGENT_WORK_CLI_TOOL_IDENTIFIER, COLLECTION_WORK_MAX_ITEMS } from '@lobechat/types';
 import { and, eq, exists, inArray, isNull } from 'drizzle-orm';
 
+import { agentDeliveryWorks } from '../../schemas/agentDelivery';
+import { goalNodeWorkVersions } from '../../schemas/goalGraph';
+import { projectWorks } from '../../schemas/projectWork';
 import { works, workVersions } from '../../schemas/work';
 import { idGenerator } from '../../utils/idGenerator';
 import { collectionCoverUrl } from './collection';
@@ -58,13 +61,23 @@ const normalizeAgentLink = (value: string): string => {
   return url.href;
 };
 
+/**
+ * Identity of an agent-registered link: the creator, the conversation and the
+ * canonical URL, like {@link fileWorkResourceId}. Registering the same link
+ * again in the same conversation adds a version; another conversation or
+ * another workspace member gets a Work of their own. The card opens `url`,
+ * never this id.
+ */
+export const linkWorkResourceId = (userId: string, topicId: string, url: string): string =>
+  `${userId}:${topicId}:${url}`;
+
 /** Tool names of the versions `createWork` / `updateWork` write. */
 const AGENT_WORK_TOOL_NAMES = ['createWork', 'updateWork'];
 
 const provenanceOf = (run: AgentWorkRunContext, toolName: string) => ({
   agentId: run.agentId ?? null,
   messageId: run.messageId ?? null,
-  rootOperationId: run.operationId,
+  rootOperationId: run.rootOperationId ?? run.operationId,
   threadId: run.threadId ?? null,
   toolCallId: run.toolCallId ?? null,
   toolIdentifier: run.toolIdentifier ?? AGENT_WORK_CLI_TOOL_IDENTIFIER,
@@ -237,14 +250,15 @@ export const createAgentWork = async (
   }
 
   const url = normalizeAgentLink(input.url);
-  const alreadyCreated = await assertNotAutoRegistered(ctx, 'link', url);
+  const resourceId = linkWorkResourceId(run.userId, run.topicId, url);
+  const alreadyCreated = await assertNotAutoRegistered(ctx, 'link', resourceId);
 
   const work = await registerExternalWork(ctx, {
     ...provenanceOf(run, 'createWork'),
     agentEditable: true,
     changeType: alreadyCreated ? 'updated' : 'created',
     description: input.description ?? null,
-    resourceId: url,
+    resourceId,
     resourceType: 'link',
     title: input.title,
     url,
@@ -376,9 +390,37 @@ export const updateAgentWork = async (
 };
 
 /**
+ * Whether a goal node, delivery or project holds this Work. Their links cascade
+ * from the Work, so deleting it would silently drop the evidence a goal node
+ * pinned, a delivery shipped or a project collected.
+ */
+const isWorkReferenced = async (ctx: WorkContext, workId: string): Promise<boolean> => {
+  const [goalNode, delivery, project] = await Promise.all([
+    ctx.db
+      .select({ id: goalNodeWorkVersions.id })
+      .from(goalNodeWorkVersions)
+      .innerJoin(workVersions, eq(workVersions.id, goalNodeWorkVersions.workVersionId))
+      .where(eq(workVersions.workId, workId))
+      .limit(1),
+    ctx.db
+      .select({ id: agentDeliveryWorks.id })
+      .from(agentDeliveryWorks)
+      .where(eq(agentDeliveryWorks.workId, workId))
+      .limit(1),
+    ctx.db
+      .select({ id: projectWorks.id })
+      .from(projectWorks)
+      .where(eq(projectWorks.workId, workId))
+      .limit(1),
+  ]);
+  return goalNode.length > 0 || delivery.length > 0 || project.length > 0;
+};
+
+/**
  * Delete a Work the agent created by mistake (`lh work delete`, `lobe-work`
  * `deleteWork`). Removes the card and its versions; the files it points at
- * stay in the file store.
+ * stay in the file store. A Work a goal node, delivery or project already holds
+ * is refused: update it instead.
  */
 export const deleteAgentWork = async (
   ctx: WorkContext,
@@ -386,6 +428,12 @@ export const deleteAgentWork = async (
   workId: string,
 ): Promise<{ id: string; title: string | null }> => {
   const work = await findAgentManagedWork(ctx, run, workId);
+  if (await isWorkReferenced(ctx, work.id)) {
+    throw new AgentWorkError(
+      'CONFLICT',
+      'This Work is part of a goal, delivery or project and cannot be deleted; update it instead',
+    );
+  }
   // Versions go with the Work through the `work_versions.work_id` cascade.
   await ctx.db.delete(works).where(and(eq(works.id, work.id), eq(works.userId, run.userId)));
   return { id: work.id, title: work.title };

@@ -1,4 +1,5 @@
 import type { BuiltinToolManifest } from '@lobechat/types';
+import { COLLECTION_WORK_MAX_ITEMS } from '@lobechat/types';
 
 import { systemPrompt } from './systemRole';
 import { WorkApiName, WorkIdentifier } from './types';
@@ -22,7 +23,7 @@ const items = {
     required: ['image'],
     type: 'object',
   },
-  maxItems: 50,
+  maxItems: COLLECTION_WORK_MAX_ITEMS,
   minItems: 1,
   type: 'array',
 } as const;

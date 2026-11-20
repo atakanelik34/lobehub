@@ -29,10 +29,14 @@ export type PluginApiWorkResourceType = 'document' | 'task';
 export interface PluginApiWorkConfig {
   action: PluginApiWorkAction;
   /**
-   * Let the agent change the Works this API creates through `lh work update`.
-   * Defaults to false: an automatically collected Work stays read-only to the
-   * agent. Applied only when the call creates the Work identity; editability
-   * never changes afterwards.
+   * Mark the Works this API creates as agent-written. Defaults to false: an
+   * automatically collected Work stays read-only to the agent. Applied only
+   * when the call creates the Work identity; editability never changes
+   * afterwards.
+   *
+   * `lh work update` / `delete` and the `lobe-work` tool change only file, link
+   * and collection Works, so on the document and task Works this API creates
+   * the flag records intent for a future policy and grants nothing today.
    *
    * Field-level policy for the agent belongs on this config too, so a future
    * system-owned field (for example a price) is declared here rather than

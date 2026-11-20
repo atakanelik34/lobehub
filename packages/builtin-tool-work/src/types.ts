@@ -46,7 +46,8 @@ export interface WorkSummary {
   /** Number of images; collection only. */
   imageCount?: number;
   title: string | null;
-  type: 'collection' | 'link';
+  /** `file` only for a file Work the CLI created and this tool renamed. */
+  type: 'collection' | 'file' | 'link';
   url?: string | null;
   workId: string;
 }

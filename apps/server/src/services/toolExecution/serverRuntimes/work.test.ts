@@ -154,6 +154,22 @@ describe('workRuntime', () => {
     });
   });
 
+  it('reports a renamed file Work as a file, not a link', async () => {
+    mocks.updateAgentWork.mockResolvedValue({
+      id: 'wk_3',
+      resourceType: 'file',
+      title: 'Q3 report',
+      type: 'file',
+      url: 'https://app.example.com/f/file_r',
+    });
+
+    const result = await workRuntime
+      .factory(context)
+      .updateWork({ title: 'Q3 report', workId: 'wk_3' });
+
+    expect(result.state).toMatchObject({ work: { type: 'file', workId: 'wk_3' } });
+  });
+
   it('replaces the collection on update and leaves it alone on a title-only update', async () => {
     mocks.updateAgentWork.mockResolvedValue({ id: 'wk_1', title: 'Covers v2', type: 'collection' });
     const runtime = workRuntime.factory(context);

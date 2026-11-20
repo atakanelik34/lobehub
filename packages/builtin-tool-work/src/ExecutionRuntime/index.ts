@@ -37,7 +37,8 @@ export class WorkToolError extends Error {
 const ERROR_CODES = new Set<WorkToolErrorCode>(WORK_TOOL_ERROR_CODES);
 
 const describeWork = (verb: string, work: WorkSummary) => {
-  const images = typeof work.imageCount === 'number' ? `, ${work.imageCount} images` : '';
+  const count = work.imageCount;
+  const images = typeof count === 'number' ? `, ${count} ${count === 1 ? 'image' : 'images'}` : '';
   return `${verb} ${work.type} Work ${work.workId} ("${work.title ?? ''}"${images}). Use workId ${work.workId} to update or delete it.`;
 };
 
@@ -47,26 +48,28 @@ export class WorkExecutionRuntime {
   constructor(private readonly service: WorkToolService) {}
 
   private async result<T>(
+    action: 'create' | 'delete' | 'update',
     run: () => Promise<{ content: string; state: T }>,
   ): Promise<BuiltinServerRuntimeOutput> {
     try {
       const { content, state } = await run();
       return { content, state, success: true };
     } catch (error) {
-      const candidate = error instanceof Error && 'code' in error ? error.code : undefined;
-      const code: WorkToolErrorCode =
-        typeof candidate === 'string' && ERROR_CODES.has(candidate as WorkToolErrorCode)
-          ? (candidate as WorkToolErrorCode)
-          : 'unknown';
+      // Only a refusal raised as `WorkToolError` is worded for the model. Any
+      // other error (a database failure, for one) may carry SQL and parameters,
+      // so the model and the stored tool state get a generic message instead.
+      const known = error instanceof WorkToolError && ERROR_CODES.has(error.code);
+      if (!known) console.error(`[lobe-work] Failed to ${action} the Work:`, error);
+      const code: WorkToolErrorCode = known ? error.code : 'unknown';
       const message =
-        error instanceof Error && error.message ? error.message : 'Could not save the Work.';
+        known && error.message ? error.message : `Failed to ${action} the Work. Try again later.`;
       const state: WorkToolErrorState = { error: { code, message } };
       return { content: message, error: { message, type: code }, state, success: false };
     }
   }
 
   createWork = (args: CreateWorkArgs) =>
-    this.result<WorkState>(async () => {
+    this.result<WorkState>('create', async () => {
       if (!args?.title?.trim()) throw invalid('A Work needs a title.');
       if (args.type === 'collection') {
         if (!args.items?.length) throw invalid('A collection needs at least one image in items.');
@@ -82,7 +85,7 @@ export class WorkExecutionRuntime {
     });
 
   updateWork = (args: UpdateWorkArgs) =>
-    this.result<WorkState>(async () => {
+    this.result<WorkState>('update', async () => {
       if (!args?.workId) throw invalid('workId is required.');
       if (args.items && args.items.length === 0) {
         throw invalid('items must list at least one image; delete the Work instead.');
@@ -98,7 +101,7 @@ export class WorkExecutionRuntime {
     });
 
   deleteWork = (args: DeleteWorkArgs) =>
-    this.result<DeleteWorkState>(async () => {
+    this.result<DeleteWorkState>('delete', async () => {
       if (!args?.workId) throw invalid('workId is required.');
       const deleted = await this.service.delete(args.workId);
       return {

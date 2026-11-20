@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as WorkModels from '@/database/models/work';
 import type { LobeChatDatabase } from '@/database/type';
 import type { HeteroOperationJwtClaims } from '@/libs/trpc/utils/internalJwt';
 import { HeteroOperationPrincipalError } from '@/server/services/heterogeneousAgent/operationPrincipal';
@@ -24,7 +25,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/database/models/workspace', () => ({
   hasActiveWorkspaceMembership: mocks.hasMembership,
 }));
-vi.mock('@/database/models/work', () => ({
+vi.mock('@/database/models/work', async (importOriginal) => ({
+  AgentWorkError: (await importOriginal<typeof WorkModels>()).AgentWorkError,
   WorkModel: class {
     constructor(...args: unknown[]) {
       mocks.workModelArgs(...args);
@@ -103,6 +105,7 @@ describe('resolveAgentWorkRun', () => {
     expect(run).toEqual({
       agentId: 'agt_1',
       operationId: 'op_run',
+      rootOperationId: 'op_run',
       threadId: 'thd_1',
       topicId: 'tpc_1',
       userId: 'user_1',
@@ -114,6 +117,30 @@ describe('resolveAgentWorkRun', () => {
       undefined,
       undefined,
     );
+  });
+
+  it("stamps a sub-agent run's Works with the root operation the run completes under", async () => {
+    const rows = [
+      operationRow({ parentOperationId: 'op_parent' }),
+      { id: 'op_parent', parentOperationId: 'op_root' },
+      { id: 'op_root', parentOperationId: null },
+    ];
+    const query = {
+      from: vi.fn(() => query),
+      limit: vi.fn(async () => [rows.shift()]),
+      where: vi.fn(() => query),
+    };
+
+    const { run } = await resolveAgentWorkRun({
+      auth: operationAuth as any,
+      db: { select: vi.fn(() => query) } as unknown as LobeChatDatabase,
+      operationId: 'op_run',
+      userId: 'user_1',
+    });
+
+    // Authorization stays on the named operation; only the cost key moves up.
+    expect(run.operationId).toBe('op_run');
+    expect(run.rootOperationId).toBe('op_root');
   });
 
   it("fences a share visitor's run to the visitor topic", async () => {
@@ -210,17 +237,32 @@ describe('parseCollectionImageRef', () => {
     expect(parseCollectionImageRef('https://app.lobehub.com/f/file_LkKoI7OfyZ0c')).toBe(
       'file_LkKoI7OfyZ0c',
     );
+    // The relative link a chat message renders for a stored file.
+    expect(parseCollectionImageRef('/f/file_LkKoI7OfyZ0c')).toBe('file_LkKoI7OfyZ0c');
   });
 
   it('refuses any other link', () => {
     expect(() => parseCollectionImageRef('https://cdn.example.com/cat.png')).toThrow(
       AgentWorkRunError,
     );
+    expect(() => parseCollectionImageRef('/images/cat.png')).toThrow(AgentWorkRunError);
   });
 });
 
 describe('resolveAgentWorkCollectionItems', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('refuses an empty or oversized list before resolving any image', async () => {
+    for (const count of [0, 51]) {
+      const error = await resolveAgentWorkCollectionItems({
+        db: dbWith(undefined),
+        items: Array.from({ length: count }, (_, i) => ({ image: `file_${i}` })),
+        userId: 'user_1',
+      }).catch((caught: unknown) => caught);
+      expect((error as { code?: string }).code).toBe('BAD_REQUEST');
+    }
+    expect(mocks.findFile).not.toHaveBeenCalled();
+  });
 
   const generatedImage = {
     fileType: 'image/png',
@@ -302,7 +344,7 @@ describe('resolveAgentWorkCollectionItems', () => {
   it("keeps a share visitor's collection to images shown in that conversation", async () => {
     mocks.findFile.mockResolvedValue(generatedImage);
     mocks.fileAccessUrl.mockResolvedValue('https://app.example.com/f/file_img');
-    const visitorRun = (shown: { content: string }[]) => {
+    const visitorRun = (shown: { content: string; role: string }[]) => {
       const query = {
         from: vi.fn(() => query),
         where: vi.fn(async () => shown),
@@ -316,8 +358,17 @@ describe('resolveAgentWorkCollectionItems', () => {
     };
 
     await expect(
-      visitorRun([{ content: '![cover](https://app.example.com/f/file_img)' }]),
+      visitorRun([{ content: '![cover](https://app.example.com/f/file_img)', role: 'tool' }]),
     ).resolves.toHaveLength(1);
+    // A visitor naming the id in their own message, or the assistant echoing it,
+    // does not prove the image was shown to them.
+    await expectStatus(
+      visitorRun([
+        { content: 'add file_img to my collection', role: 'user' },
+        { content: 'Sure, adding file_img', role: 'assistant' },
+      ]),
+      404,
+    );
     // The creator's other images never appeared to this visitor.
     await expectStatus(visitorRun([]), 404);
   });

@@ -4,9 +4,11 @@ import { AGENT_WORK_CLI_TOOL_IDENTIFIER } from '@lobechat/types';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { topics, works, workspaces } from '../../../schemas';
+import { goalNodes, goalNodeWorkVersions, topics, works, workspaces } from '../../../schemas';
+import { GoalModel } from '../../goal';
 import { TaskModel } from '../../task';
 import { AgentWorkError, WorkModel } from '..';
+import { linkWorkResourceId } from '../agentWork';
 import { fileWorkResourceId } from '../file';
 import {
   agentId,
@@ -63,7 +65,7 @@ describe('WorkModel · agent-created Works', () => {
 
     expect(work).toMatchObject({
       description: 'Preview deployment',
-      resourceId: 'https://preview.example.com/landing',
+      resourceId: linkWorkResourceId(userId, topicId, 'https://preview.example.com/landing'),
       resourceType: 'link',
       title: 'Landing preview',
       toolIdentifier: AGENT_WORK_CLI_TOOL_IDENTIFIER,
@@ -258,21 +260,86 @@ describe('WorkModel · agent-created Works', () => {
       'NOT_FOUND',
     );
 
-    // Registering the same link there joins that conversation, labelled as an update.
+    // The same link in another conversation is a Work of that conversation, so
+    // that run still cannot reach the first one through it.
     const again = await workModel().createAgentWork(otherRun, {
       title: 'Preview',
       type: 'link',
       url: 'https://preview.example.com',
     });
-    expect(again.id).toBe(created.id);
+    expect(again.id).not.toBe(created.id);
+    await expectAgentWorkError(
+      workModel().updateAgentWork(otherRun, { title: 'Renamed', workId: created.id }),
+      'NOT_FOUND',
+    );
+    await expectAgentWorkError(workModel().deleteAgentWork(otherRun, created.id), 'NOT_FOUND');
+    expect((await workModel().listVersions(created.id)).length).toBe(1);
+
+    // In its own conversation, registering the link again adds a version.
+    const repeat = await workModel().createAgentWork(run, {
+      title: 'Preview v2',
+      type: 'link',
+      url: 'https://preview.example.com',
+    });
+    expect(repeat.id).toBe(created.id);
     const versions = await workModel().listVersions(created.id);
     expect(versions.map((version) => version.changeType).sort()).toEqual(['created', 'updated']);
+  });
 
-    const renamed = await workModel().updateAgentWork(otherRun, {
-      title: 'Renamed',
-      workId: created.id,
+  it('lets two workspace members register the same link', async () => {
+    const workspaceId = 'work-agent-workspace-link';
+    await serverDB.insert(workspaces).values({
+      id: workspaceId,
+      name: 'Test',
+      primaryOwnerId: userId,
+      slug: 'agent-work-link',
     });
-    expect(renamed.title).toBe('Renamed');
+    try {
+      const link = { title: 'Docs', type: 'link', url: 'https://docs.example.com' } as const;
+      const mine = await new WorkModel(serverDB, userId, workspaceId).createAgentWork(run, link);
+      const theirs = await new WorkModel(serverDB, userId2, workspaceId).createAgentWork(
+        { ...run, userId: userId2 },
+        link,
+      );
+
+      expect(theirs.id).not.toBe(mine.id);
+      expect(theirs.userId).toBe(userId2);
+    } finally {
+      await serverDB.delete(workspaces).where(eq(workspaces.id, workspaceId));
+    }
+  });
+
+  it('refuses to delete a Work a goal node holds', async () => {
+    const created = await workModel().createAgentWork(run, {
+      title: 'Preview',
+      type: 'link',
+      url: 'https://preview.example.com',
+    });
+    const goal = await new GoalModel(serverDB, userId).create({
+      subjectType: 'standalone',
+      title: 'Ship the landing page',
+    });
+    const [node] = await serverDB
+      .insert(goalNodes)
+      .values({ goalId: goal.id, kind: 'task', title: 'Build preview' })
+      .returning();
+    const [version] = await workModel().listVersions(created.id);
+    await serverDB
+      .insert(goalNodeWorkVersions)
+      .values({ nodeId: node.id, relation: 'produced', workVersionId: version.id });
+
+    await expectAgentWorkError(workModel().deleteAgentWork(run, created.id), 'CONFLICT');
+    expect(await serverDB.select().from(works).where(eq(works.id, created.id))).toHaveLength(1);
+  });
+
+  it("stamps a sub-agent run's versions with the root operation", async () => {
+    const created = await workModel().createAgentWork(
+      { ...run, operationId: 'op-child', rootOperationId: 'op-root' },
+      { title: 'Preview', type: 'link', url: 'https://preview.example.com' },
+    );
+
+    const [version] = await workModel().listVersions(created.id);
+    expect(version.rootOperationId).toBe('op-root');
   });
 
   it("keeps a teammate's agent Work out of reach in a workspace", async () => {

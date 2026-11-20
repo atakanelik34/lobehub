@@ -1,9 +1,9 @@
 import type { AgentWorkRunContext, CollectionWorkItem, WorkAccessScope } from '@lobechat/types';
-import { FileSource } from '@lobechat/types';
+import { COLLECTION_WORK_MAX_ITEMS, FileSource } from '@lobechat/types';
 import { and, eq, or, sql } from 'drizzle-orm';
 
 import { FileModel } from '@/database/models/file';
-import { WorkModel } from '@/database/models/work';
+import { AgentWorkError, WorkModel } from '@/database/models/work';
 import { hasActiveWorkspaceMembership } from '@/database/models/workspace';
 import { agentOperations, generations, messages } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
@@ -27,6 +27,34 @@ export class AgentWorkRunError extends Error {
     this.name = 'AgentWorkRunError';
   }
 }
+
+/** Deepest parent chain walked; operation trees are a few levels deep. */
+const MAX_OPERATION_DEPTH = 10;
+
+/**
+ * The top of the operation tree a run belongs to. Run completion fills the
+ * cost of agent-written versions by the root operation id, so a sub-agent's
+ * `lh work` call must stamp the root, not its own operation. Authorization
+ * stays bound to the operation the caller named.
+ */
+const resolveRootOperationId = async (
+  db: LobeChatDatabase,
+  start: { operationId: string; parentOperationId: string | null; userId: string },
+): Promise<string> => {
+  let rootId = start.operationId;
+  let parentId = start.parentOperationId;
+  for (let depth = 0; parentId && depth < MAX_OPERATION_DEPTH; depth += 1) {
+    const [parent] = await db
+      .select({ id: agentOperations.id, parentOperationId: agentOperations.parentOperationId })
+      .from(agentOperations)
+      .where(and(eq(agentOperations.id, parentId), eq(agentOperations.userId, start.userId)))
+      .limit(1);
+    if (!parent) break;
+    rootId = parent.id;
+    parentId = parent.parentOperationId;
+  }
+  return rootId;
+};
 
 export interface AgentWorkRun {
   run: AgentWorkRunContext;
@@ -76,6 +104,7 @@ export const resolveAgentWorkRun = async (params: {
   const [operation] = await db
     .select({
       agentId: agentOperations.agentId,
+      parentOperationId: agentOperations.parentOperationId,
       status: agentOperations.status,
       threadId: agentOperations.threadId,
       topicId: agentOperations.topicId,
@@ -121,6 +150,11 @@ export const resolveAgentWorkRun = async (params: {
     run: {
       agentId: operation.agentId,
       operationId,
+      rootOperationId: await resolveRootOperationId(db, {
+        operationId,
+        parentOperationId: operation.parentOperationId,
+        userId,
+      }),
       threadId: operation.threadId,
       topicId: operation.topicId,
       userId,
@@ -171,9 +205,12 @@ const COLLECTION_IMAGE_SOURCES = new Set<string>([
  */
 export const parseCollectionImageRef = (ref: string): string => {
   const value = ref.trim();
-  if (!/^https?:\/\//i.test(value)) return value;
+  const isAbsolute = /^https?:\/\//i.test(value);
+  // A relative `/f/<id>` link is what a chat message renders for a stored file.
+  if (!isAbsolute && !value.startsWith('/')) return value;
   try {
-    const match = /^\/f\/([^/]+)\/?$/.exec(new URL(value).pathname);
+    const { pathname } = isAbsolute ? new URL(value) : new URL(value, 'https://relative.invalid');
+    const match = /^\/f\/([^/]+)\/?$/.exec(pathname);
     if (match) return decodeURIComponent(match[1]);
   } catch {
     // Fall through to the error below.
@@ -189,7 +226,7 @@ const isGenerationId = (id: string) => id.startsWith('gen_');
  * shows comes from the file row, never from the agent.
  *
  * `visitorTopicId` is set for a share visitor's run, which executes as the
- * creator: each image must then appear in a message of that visitor's
+ * creator: each image must then appear in a tool result of that visitor's
  * conversation, so a visitor cannot pull the creator's other images into a
  * card by guessing their ids.
  */
@@ -201,6 +238,17 @@ export const resolveAgentWorkCollectionItems = async (params: {
   workspaceId?: string;
 }): Promise<CollectionWorkItem[]> => {
   const { db, items, userId, visitorTopicId, workspaceId } = params;
+  // Check the count before resolving: every item costs file (and generation)
+  // queries, so an oversized list is refused before any of them run.
+  if (items.length === 0) {
+    throw new AgentWorkError('BAD_REQUEST', 'A collection needs at least one image');
+  }
+  if (items.length > COLLECTION_WORK_MAX_ITEMS) {
+    throw new AgentWorkError(
+      'BAD_REQUEST',
+      `A collection holds at most ${COLLECTION_WORK_MAX_ITEMS} images`,
+    );
+  }
   const fileModel = new FileModel(db, userId, workspaceId);
   const fileService = new FileService(db, userId, workspaceId);
 
@@ -235,7 +283,7 @@ export const resolveAgentWorkCollectionItems = async (params: {
     // tool result that produced them. One scan of the topic returns the
     // messages naming any of the images.
     const shown = await db
-      .select({ content: messages.content })
+      .select({ content: messages.content, role: messages.role })
       .from(messages)
       .where(
         and(
@@ -244,7 +292,12 @@ export const resolveAgentWorkCollectionItems = async (params: {
           or(...files.map(({ ref }) => sql`position(${ref} in ${messages.content}) > 0`)),
         ),
       );
-    const missing = files.find(({ ref }) => !shown.some(({ content }) => content?.includes(ref)));
+    // Only tool results count: a message the visitor typed, or an assistant
+    // reply echoing it, can name any id the visitor guessed.
+    const toolResults = shown.filter(({ role }) => role === 'tool');
+    const missing = files.find(
+      ({ ref }) => !toolResults.some(({ content }) => content?.includes(ref)),
+    );
     if (missing) throw new AgentWorkRunError(`Image ${missing.image} not found`, 404);
   }
 

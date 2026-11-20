@@ -72,6 +72,16 @@ describe('WorkExecutionRuntime', () => {
     expect(result.content).toContain('2 images');
   });
 
+  it('counts a single image in the singular', async () => {
+    const result = await new WorkExecutionRuntime(service()).createWork({
+      items: [{ image: 'file_a' }],
+      title: 'Cover',
+      type: 'collection',
+    });
+
+    expect(result.content).toContain(', 1 image)');
+  });
+
   it('deletes a Work and says the images stay', async () => {
     const result = await new WorkExecutionRuntime(service()).deleteWork({ workId: 'wk_1' });
 
@@ -91,10 +101,11 @@ describe('WorkExecutionRuntime', () => {
     const unknown = new WorkExecutionRuntime(
       service({
         delete: async () => {
-          throw new Error('db down');
+          throw new Error('Failed query: delete from "works" where "id" = $1 params: wk_x');
         },
       }),
     );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const notFound = await known.deleteWork({ workId: 'wk_x' });
     expect(notFound).toMatchObject({
@@ -103,6 +114,15 @@ describe('WorkExecutionRuntime', () => {
       state: { error: { code: 'not_found', message: 'Work wk_x not found' } },
       success: false,
     });
-    expect((await unknown.deleteWork({ workId: 'wk_x' })).error?.type).toBe('unknown');
+    // A database error never reaches the model or the stored tool state.
+    const failed = await unknown.deleteWork({ workId: 'wk_x' });
+    expect(failed).toMatchObject({
+      content: 'Failed to delete the Work. Try again later.',
+      error: { type: 'unknown' },
+      state: { error: { code: 'unknown' } },
+    });
+    expect(JSON.stringify(failed)).not.toContain('Failed query');
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

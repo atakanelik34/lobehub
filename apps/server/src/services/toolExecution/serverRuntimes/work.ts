@@ -53,7 +53,9 @@ const guarded =
 const summarize = (work: WorkItem, imageCount?: number): WorkSummary => ({
   ...(imageCount === undefined ? {} : { imageCount }),
   title: work.title ?? null,
-  type: work.type === 'collection' ? 'collection' : 'link',
+  // An external Work this tool writes is always a link; a `file` Work is one the
+  // CLI created in this conversation that the agent renamed here.
+  type: work.type === 'collection' || work.type === 'file' ? work.type : 'link',
   url: work.url ?? null,
   workId: work.id,
 });

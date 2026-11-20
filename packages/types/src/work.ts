@@ -915,6 +915,12 @@ export interface AgentWorkRunContext {
   /** The assistant message of the tool call, when a builtin tool (not the CLI) writes. */
   messageId?: string | null;
   operationId: string;
+  /**
+   * Top of the operation tree `operationId` runs in, stamped on versions as
+   * `rootOperationId` so run completion can fill their cost. Defaults to
+   * `operationId`.
+   */
+  rootOperationId?: string;
   threadId?: string | null;
   /** Tool call id of a builtin-tool write; a retried call does not add a second version. */
   toolCallId?: string | null;

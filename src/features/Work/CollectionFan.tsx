@@ -53,6 +53,7 @@ const CollectionFan = memo<CollectionFanProps>(({ urls }) => {
         <img
           alt=""
           key={url}
+          loading="lazy"
           src={url}
           {...stylex.props(styles.image, styles.transform(transforms[index]))}
         />
