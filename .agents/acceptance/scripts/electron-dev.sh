@@ -10,6 +10,9 @@
 #
 # Instance pool (concurrent isolated instances — e.g. one git worktree each):
 #   ./electron-dev.sh start <id>   # CDP 9222+id, Vite 5173+id, own userData + IPC id
+#   ./electron-dev.sh start <id> -- <app args>
+#                                  # …and hand <app args> to the app itself, e.g.
+#                                  #   start 11 -- /Users/me/code/repo   (cold start)
 #   ./electron-dev.sh stop <id>    # stop ONLY instance <id> (never touches siblings)
 #   ./electron-dev.sh stop --all   # stop every pool instance
 #   ./electron-dev.sh status <id>
@@ -61,6 +64,15 @@ ENV_ELECTRON_LOG="${ELECTRON_LOG:-}"
 
 CMD="${1:-help}"
 INSTANCE="${2:-}" # empty = legacy single instance; integer = pool member
+
+# Everything after `start <id> --` reaches the Electron app itself: `pnpm dev`
+# forwards args following `--` to the app, which is how a launch with a real
+# directory argument (cold start) is exercised without a packaged build.
+APP_ARGS=()
+if [ "${3:-}" = "--" ]; then
+  shift 3
+  APP_ARGS=("$@")
+fi
 
 CDP_BASE="${CDP_BASE:-9222}"
 VITE_BASE="${VITE_BASE:-5173}"
@@ -386,15 +398,20 @@ do_start() {
   : >"$ELECTRON_LOG"
 
   # Values reach `env` as separate argv entries, so labels and paths with spaces
-  # or quotes survive without shell re-parsing.
+  # or quotes survive without shell re-parsing. Anything after `--` is the app's
+  # own argv (`pnpm dev -- …` forwards it), which lets a launch be exercised
+  # with a real directory argument.
   # shellcheck disable=SC2016 # expanded by the inner bash, not here
-  local launch_cmd='cd "$1" && shift && exec env "$@" pnpm dev'
+  local launch_cmd='cd "$1" && shift && env_args=(); while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do env_args+=("$1"); shift; done; if [ "$#" -gt 0 ]; then shift; fi; exec env "${env_args[@]}" pnpm dev -- "$@"'
+  local app_argv=()
+  [ ${#APP_ARGS[@]} -gt 0 ] && app_argv=("--" "${APP_ARGS[@]}")
+
   if command -v setsid >/dev/null 2>&1; then
     setsid bash -c "$launch_cmd" electron-dev "$PROJECT_ROOT/apps/desktop" "${env_assignments[@]}" \
-      >>"$ELECTRON_LOG" 2>&1 </dev/null &
+      ${app_argv[@]+"${app_argv[@]}"} >>"$ELECTRON_LOG" 2>&1 </dev/null &
   else
     bash -c "$launch_cmd" electron-dev "$PROJECT_ROOT/apps/desktop" "${env_assignments[@]}" \
-      >>"$ELECTRON_LOG" 2>&1 </dev/null &
+      ${app_argv[@]+"${app_argv[@]}"} >>"$ELECTRON_LOG" 2>&1 </dev/null &
   fi
   local launcher_pid=$!
   echo "$launcher_pid" >"$PIDFILE"
@@ -514,6 +531,7 @@ case "$CMD" in
     echo "  start [<id>]      — Start an instance. No id = legacy single instance (CDP 9222)."
     echo "                      <id> = pool member: CDP 9222+id, Vite 5173+id, own userData"
     echo "                      (login seeded from the saved snapshot) + IPC id."
+    echo "                      start <id> -- <app args> forwards args to the app"
     echo "  stop [<id>]       — Stop an instance. Pool stop is sibling-safe, and snapshots the"
     echo "                      instance's login first. KEEP_DATA=1 preserves the userData;"
     echo "                      SKIP_LOGIN_SAVE=1 skips the snapshot."
