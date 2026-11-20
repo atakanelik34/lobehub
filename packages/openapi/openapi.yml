@@ -3470,7 +3470,7 @@ components:
                 - linear_issue
                 - link
                 - file
-                - gallery
+                - collection
                 - goal_report
                 - task
             status:
@@ -3488,7 +3488,7 @@ components:
                 - document
                 - external
                 - file
-                - gallery
+                - collection
                 - goal_report
                 - task
             url:

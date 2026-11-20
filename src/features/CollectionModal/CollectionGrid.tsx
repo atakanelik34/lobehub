@@ -1,4 +1,4 @@
-import type { GalleryWorkImage } from '@lobechat/types';
+import type { CollectionWorkItem } from '@lobechat/types';
 import { Image, PreviewGroup, Text } from '@lobehub/ui';
 import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 import * as stylex from '@stylexjs/stylex';
@@ -13,7 +13,7 @@ const styles = stylex.create({
   },
   grid: {
     display: 'grid',
-    // Keep in step with GALLERY_GRID_GAP / GALLERY_TILE_SIZE in ./layout; StyleX needs literals.
+    // Keep in step with COLLECTION_GRID_GAP / COLLECTION_TILE_SIZE in ./layout; StyleX needs literals.
     gap: 12,
     // auto-fit collapses unused tracks, so fewer images than columns stretch to fill the row.
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
@@ -26,16 +26,16 @@ const styles = stylex.create({
   },
 });
 
-interface GalleryGridProps {
-  items: GalleryWorkImage[];
+interface CollectionGridProps {
+  items: CollectionWorkItem[];
 }
 
 /**
- * Square tiles of every gallery image. One preview group lets the viewer step
- * through the gallery; its download action saves `/f/<id>` images under their
+ * Square tiles of every collection image. One preview group lets the viewer step
+ * through the collection; its download action saves `/f/<id>` images under their
  * stored names.
  */
-const GalleryGrid = ({ items }: GalleryGridProps) => (
+const CollectionGrid = ({ items }: CollectionGridProps) => (
   <PreviewGroup preview={{ onDownload: downloadPreviewImage }}>
     <div {...stylex.props(styles.grid)}>
       {items.map((item) => (
@@ -60,4 +60,4 @@ const GalleryGrid = ({ items }: GalleryGridProps) => (
   </PreviewGroup>
 );
 
-export default GalleryGrid;
+export default CollectionGrid;

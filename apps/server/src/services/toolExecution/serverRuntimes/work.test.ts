@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   construct: vi.fn(),
   createAgentWork: vi.fn(),
   deleteAgentWork: vi.fn(),
-  resolveGallery: vi.fn(),
+  resolveCollection: vi.fn(),
   updateAgentWork: vi.fn(),
 }));
 
@@ -44,8 +44,8 @@ vi.mock('@/server/services/workRegistration', async () => {
   );
   return {
     AgentWorkRunError: agentWork.AgentWorkRunError,
-    parseGalleryImageRef: agentWork.parseGalleryImageRef,
-    resolveAgentWorkGalleryItems: mocks.resolveGallery,
+    parseCollectionImageRef: agentWork.parseCollectionImageRef,
+    resolveAgentWorkCollectionItems: mocks.resolveCollection,
     resolveRunWorkAccessScope: scope.resolveRunWorkAccessScope,
   };
 });
@@ -78,14 +78,14 @@ const run = {
   userId: 'user',
 };
 
-const galleryItems = [
+const collectionItems = [
   { fileId: 'file_a', mimeType: 'image/png', url: 'https://cdn/a.png' },
   { caption: 'Night', fileId: 'file_b', mimeType: 'image/png', url: 'https://cdn/b.png' },
 ];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.resolveGallery.mockResolvedValue(galleryItems);
+  mocks.resolveCollection.mockResolvedValue(collectionItems);
 });
 
 describe('workRuntime', () => {
@@ -95,11 +95,11 @@ describe('workRuntime', () => {
     expect(getServerRuntime(WorkIdentifier, context)).toBeDefined();
   });
 
-  it('creates a gallery from the run context, resolving images and the cover', async () => {
+  it('creates a collection from the run context, resolving images and the cover', async () => {
     mocks.createAgentWork.mockResolvedValue({
       id: 'wk_1',
       title: 'Covers',
-      type: 'gallery',
+      type: 'collection',
       url: 'https://cdn/b.png',
     });
 
@@ -107,11 +107,11 @@ describe('workRuntime', () => {
       coverImage: 'https://app.lobehub.com/f/file_b',
       items: [{ image: 'file_a' }, { caption: 'Night', image: '/f/file_b' }],
       title: 'Covers',
-      type: 'gallery',
+      type: 'collection',
     });
 
     expect(mocks.construct).toHaveBeenCalledWith(context.serverDB, 'user', 'workspace', undefined);
-    expect(mocks.resolveGallery).toHaveBeenCalledWith({
+    expect(mocks.resolveCollection).toHaveBeenCalledWith({
       db: context.serverDB,
       items: [{ image: 'file_a' }, { caption: 'Night', image: '/f/file_b' }],
       userId: 'user',
@@ -120,12 +120,12 @@ describe('workRuntime', () => {
     expect(mocks.createAgentWork).toHaveBeenCalledWith(run, {
       coverFileId: 'file_b',
       description: undefined,
-      items: galleryItems,
+      items: collectionItems,
       title: 'Covers',
-      type: 'gallery',
+      type: 'collection',
     });
     expect(result).toMatchObject({
-      state: { work: { imageCount: 2, title: 'Covers', type: 'gallery', workId: 'wk_1' } },
+      state: { work: { imageCount: 2, title: 'Covers', type: 'collection', workId: 'wk_1' } },
       success: true,
     });
   });
@@ -154,23 +154,23 @@ describe('workRuntime', () => {
     });
   });
 
-  it('replaces the gallery on update and leaves it alone on a title-only update', async () => {
-    mocks.updateAgentWork.mockResolvedValue({ id: 'wk_1', title: 'Covers v2', type: 'gallery' });
+  it('replaces the collection on update and leaves it alone on a title-only update', async () => {
+    mocks.updateAgentWork.mockResolvedValue({ id: 'wk_1', title: 'Covers v2', type: 'collection' });
     const runtime = workRuntime.factory(context);
 
     await runtime.updateWork({ items: [{ image: 'file_a' }], workId: 'wk_1' });
     expect(mocks.updateAgentWork).toHaveBeenLastCalledWith(run, {
       description: undefined,
-      gallery: { items: galleryItems },
+      collection: { items: collectionItems },
       title: undefined,
       workId: 'wk_1',
     });
 
     await runtime.updateWork({ title: 'Covers v2', workId: 'wk_1' });
-    expect(mocks.resolveGallery).toHaveBeenCalledTimes(1);
+    expect(mocks.resolveCollection).toHaveBeenCalledTimes(1);
     expect(mocks.updateAgentWork).toHaveBeenLastCalledWith(run, {
       description: undefined,
-      gallery: undefined,
+      collection: undefined,
       title: 'Covers v2',
       workId: 'wk_1',
     });
@@ -195,17 +195,17 @@ describe('workRuntime', () => {
     });
 
     mocks.updateAgentWork.mockRejectedValueOnce(
-      new AgentWorkError('BAD_REQUEST', 'Only a gallery'),
+      new AgentWorkError('BAD_REQUEST', 'Only a collection'),
     );
     expect((await runtime.updateWork({ title: 'x', workId: 'wk_1' })).error?.type).toBe(
       'invalid_input',
     );
 
-    mocks.resolveGallery.mockRejectedValueOnce(
+    mocks.resolveCollection.mockRejectedValueOnce(
       new AgentWorkRunError('Image file_z not found', 404),
     );
     expect(
-      (await runtime.createWork({ items: [{ image: 'file_z' }], title: 'x', type: 'gallery' }))
+      (await runtime.createWork({ items: [{ image: 'file_z' }], title: 'x', type: 'collection' }))
         .error?.type,
     ).toBe('not_found');
 
@@ -216,7 +216,7 @@ describe('workRuntime', () => {
           coverImage: 'https://example.com/x.png',
           items: [{ image: 'file_a' }],
           title: 'x',
-          type: 'gallery',
+          type: 'collection',
         })
       ).error?.type,
     ).toBe('not_found');
@@ -239,7 +239,7 @@ describe('workRuntime', () => {
   });
 
   it('maps a cover named by generationId to that image file', async () => {
-    mocks.resolveGallery.mockResolvedValueOnce([
+    mocks.resolveCollection.mockResolvedValueOnce([
       { fileId: 'file_a', mimeType: 'image/png', url: 'https://app.example.com/f/file_a' },
       { fileId: 'file_b', mimeType: 'image/png', url: 'https://app.example.com/f/file_b' },
     ]);
@@ -248,7 +248,7 @@ describe('workRuntime', () => {
       coverImage: 'gen_2',
       items: [{ image: 'gen_1' }, { image: 'gen_2' }],
       title: 'Cats',
-      type: 'gallery',
+      type: 'collection',
     });
 
     expect(mocks.createAgentWork).toHaveBeenCalledWith(
@@ -257,15 +257,15 @@ describe('workRuntime', () => {
     );
   });
 
-  it("checks a share visitor's gallery images against the visitor conversation", async () => {
+  it("checks a share visitor's collection images against the visitor conversation", async () => {
     await workRuntime
       .factory({
         ...context,
         agentShareVisitor: { agentId: 'agent', shareId: 'share-1', visitorUserId: 'visitor' },
       })
-      .createWork({ items: [{ image: 'file_a' }], title: 'Covers', type: 'gallery' });
+      .createWork({ items: [{ image: 'file_a' }], title: 'Covers', type: 'collection' });
 
-    expect(mocks.resolveGallery).toHaveBeenCalledWith(
+    expect(mocks.resolveCollection).toHaveBeenCalledWith(
       expect.objectContaining({ visitorTopicId: context.topicId }),
     );
   });

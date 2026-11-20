@@ -6,9 +6,9 @@ import { HeteroOperationPrincipalError } from '@/server/services/heterogeneousAg
 
 import {
   AgentWorkRunError,
-  parseGalleryImageRef,
+  parseCollectionImageRef,
+  resolveAgentWorkCollectionItems,
   resolveAgentWorkFile,
-  resolveAgentWorkGalleryItems,
   resolveAgentWorkRun,
 } from './agentWork';
 
@@ -204,22 +204,22 @@ describe('resolveAgentWorkFile', () => {
   });
 });
 
-describe('parseGalleryImageRef', () => {
+describe('parseCollectionImageRef', () => {
   it('reads a bare file id and the /f/ link image generation returns', () => {
-    expect(parseGalleryImageRef('file_LkKoI7OfyZ0c')).toBe('file_LkKoI7OfyZ0c');
-    expect(parseGalleryImageRef('https://app.lobehub.com/f/file_LkKoI7OfyZ0c')).toBe(
+    expect(parseCollectionImageRef('file_LkKoI7OfyZ0c')).toBe('file_LkKoI7OfyZ0c');
+    expect(parseCollectionImageRef('https://app.lobehub.com/f/file_LkKoI7OfyZ0c')).toBe(
       'file_LkKoI7OfyZ0c',
     );
   });
 
   it('refuses any other link', () => {
-    expect(() => parseGalleryImageRef('https://cdn.example.com/cat.png')).toThrow(
+    expect(() => parseCollectionImageRef('https://cdn.example.com/cat.png')).toThrow(
       AgentWorkRunError,
     );
   });
 });
 
-describe('resolveAgentWorkGalleryItems', () => {
+describe('resolveAgentWorkCollectionItems', () => {
   beforeEach(() => vi.clearAllMocks());
 
   const generatedImage = {
@@ -238,7 +238,7 @@ describe('resolveAgentWorkGalleryItems', () => {
     );
 
     await expect(
-      resolveAgentWorkGalleryItems({
+      resolveAgentWorkCollectionItems({
         db: dbWith(undefined),
         items: [
           { caption: ' Apple ', image: 'https://app.lobehub.com/f/file_a' },
@@ -264,7 +264,7 @@ describe('resolveAgentWorkGalleryItems', () => {
   ])('refuses %s', async (_, file, status) => {
     mocks.findFile.mockResolvedValue(file);
     await expectStatus(
-      resolveAgentWorkGalleryItems({
+      resolveAgentWorkCollectionItems({
         db: dbWith(undefined),
         items: [{ image: 'file_img' }],
         userId: 'user_1',
@@ -278,7 +278,7 @@ describe('resolveAgentWorkGalleryItems', () => {
     mocks.fileAccessUrl.mockResolvedValue('https://app.example.com/f/file_img');
 
     await expect(
-      resolveAgentWorkGalleryItems({
+      resolveAgentWorkCollectionItems({
         db: dbWith({ fileId: 'file_img' }),
         items: [{ image: 'gen_cat1' }],
         userId: 'user_1',
@@ -290,7 +290,7 @@ describe('resolveAgentWorkGalleryItems', () => {
 
     // Another user's generation, or one that has no stored image yet.
     await expectStatus(
-      resolveAgentWorkGalleryItems({
+      resolveAgentWorkCollectionItems({
         db: dbWith(undefined),
         items: [{ image: 'gen_other' }],
         userId: 'user_1',
@@ -299,7 +299,7 @@ describe('resolveAgentWorkGalleryItems', () => {
     );
   });
 
-  it("keeps a share visitor's gallery to images shown in that conversation", async () => {
+  it("keeps a share visitor's collection to images shown in that conversation", async () => {
     mocks.findFile.mockResolvedValue(generatedImage);
     mocks.fileAccessUrl.mockResolvedValue('https://app.example.com/f/file_img');
     const visitorRun = (shown: { content: string }[]) => {
@@ -307,7 +307,7 @@ describe('resolveAgentWorkGalleryItems', () => {
         from: vi.fn(() => query),
         where: vi.fn(async () => shown),
       };
-      return resolveAgentWorkGalleryItems({
+      return resolveAgentWorkCollectionItems({
         db: { select: vi.fn(() => query) } as unknown as LobeChatDatabase,
         items: [{ image: 'file_img' }],
         userId: 'user_1',

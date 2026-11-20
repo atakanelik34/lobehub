@@ -7,7 +7,7 @@ import { CircleDollarSignIcon, CoinsIcon, GitBranchIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { openGalleryModal } from '@/features/GalleryModal/loader';
+import { openCollectionModal } from '@/features/CollectionModal/loader';
 import { useChatStore } from '@/store/chat';
 import { useDensityTokens } from '@/styles/density';
 import { sidebarRow } from '@/styles/density.stylex';
@@ -16,15 +16,15 @@ import { getWorkVersionTotalTokens } from '@/utils/workCumulativeUsage';
 import { formatWorkVersionCost } from '@/utils/workVersionCost';
 
 import CanvasWorkCard from './CanvasWorkCard';
+import CollectionFan from './CollectionFan';
 import {
-  getGalleryCoverUrl,
-  getGalleryFanUrls,
-  getGalleryImageCount,
+  getCollectionCoverUrl,
+  getCollectionFanUrls,
+  getCollectionImageCount,
   getWorkTypeDescriptor,
   type WorkBranch,
   type WorkIcon,
 } from './descriptors';
-import GalleryFan from './GalleryFan';
 import { openExternalWork } from './openExternalWork';
 import { useResourceDeletedPrompt } from './useResourceDeletedPrompt';
 
@@ -347,14 +347,14 @@ const WorkSummaryCard = memo<WorkSummaryCardProps>(
     // (e.g. `QA-1989`, `owner/repo#2`) on the card itself, unless the title
     // already fell back to it.
     const identifier = descriptor.getIdentifier(item);
-    // A gallery shows its cover in place of the icon and its image count in the identifier slot.
-    const coverUrl = item.type === 'gallery' ? getGalleryCoverUrl(item) : null;
-    const imageCount = item.type === 'gallery' ? getGalleryImageCount(item) : null;
-    // The card fans a multi-image gallery so it reads as a set; smaller rows keep the cover alone.
-    const fanUrls = item.type === 'gallery' ? getGalleryFanUrls(item) : [];
+    // A collection shows its cover in place of the icon and its image count in the identifier slot.
+    const coverUrl = item.type === 'collection' ? getCollectionCoverUrl(item) : null;
+    const imageCount = item.type === 'collection' ? getCollectionImageCount(item) : null;
+    // The card fans a multi-image collection so it reads as a set; smaller rows keep the cover alone.
+    const fanUrls = item.type === 'collection' ? getCollectionFanUrls(item) : [];
     const metaIdentifier =
       imageCount !== null
-        ? t('workingPanel.works.galleryCount', { count: imageCount })
+        ? t('workingPanel.works.collectionCount', { count: imageCount })
         : identifier && identifier !== title
           ? identifier
           : null;
@@ -403,8 +403,8 @@ const WorkSummaryCard = memo<WorkSummaryCardProps>(
           openFilePreview({ fileId: openTarget.fileId });
           return;
         }
-        case 'gallery': {
-          void openGalleryModal(openTarget);
+        case 'collection': {
+          void openCollectionModal(openTarget);
           return;
         }
         case 'task': {
@@ -504,7 +504,7 @@ const WorkSummaryCard = memo<WorkSummaryCardProps>(
         onClick={clickable ? handleOpen : undefined}
       >
         {fanUrls.length > 1 ? (
-          <GalleryFan urls={fanUrls} />
+          <CollectionFan urls={fanUrls} />
         ) : (
           <Flexbox align={'center'} className={styles.icon} justify={'center'} title={stateLabel}>
             {coverUrl ? (

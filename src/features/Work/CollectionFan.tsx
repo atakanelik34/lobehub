@@ -36,13 +36,13 @@ const TRANSFORMS: Record<number, string[]> = {
   3: ['translateX(-5px) rotate(-12deg)', 'translateX(5px) rotate(12deg)', 'rotate(0deg)'],
 };
 
-interface GalleryFanProps {
+interface CollectionFanProps {
   /** Two or three image URLs, cover first. */
   urls: string[];
 }
 
-/** Gallery card thumbnail: the cover in front with up to two more images fanned behind it. */
-const GalleryFan = memo<GalleryFanProps>(({ urls }) => {
+/** Collection card thumbnail: the cover in front with up to two more images fanned behind it. */
+const CollectionFan = memo<CollectionFanProps>(({ urls }) => {
   const [cover, ...rest] = urls;
   const ordered = [...rest, cover];
   const transforms = TRANSFORMS[ordered.length] ?? TRANSFORMS[3];
@@ -61,6 +61,6 @@ const GalleryFan = memo<GalleryFanProps>(({ urls }) => {
   );
 });
 
-GalleryFan.displayName = 'GalleryFan';
+CollectionFan.displayName = 'CollectionFan';
 
-export default GalleryFan;
+export default CollectionFan;

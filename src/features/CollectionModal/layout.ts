@@ -1,6 +1,6 @@
-/** Width of one square tile in the gallery grid. */
-const GALLERY_TILE_SIZE = 200;
-const GALLERY_GRID_GAP = 12;
+/** Width of one square tile in the collection grid. */
+const COLLECTION_TILE_SIZE = 200;
+const COLLECTION_GRID_GAP = 12;
 
 /** Two columns at least, so a single image and the title get room; the grid stretches it. */
 const MIN_COLUMNS = 2;
@@ -13,9 +13,9 @@ const MODAL_PADDING_X = 48;
  * would otherwise sit in the left third of a 960px modal. Without a known count
  * (the modal loads the images itself) it falls back to four columns.
  */
-export const getGalleryModalWidth = (count?: number) => {
+export const getCollectionModalWidth = (count?: number) => {
   const columns = Math.min(Math.max(count ?? MAX_COLUMNS, MIN_COLUMNS), MAX_COLUMNS);
-  const content = columns * GALLERY_TILE_SIZE + (columns - 1) * GALLERY_GRID_GAP;
+  const content = columns * COLLECTION_TILE_SIZE + (columns - 1) * COLLECTION_GRID_GAP;
 
   return `min(95vw, ${content + MODAL_PADDING_X}px)`;
 };

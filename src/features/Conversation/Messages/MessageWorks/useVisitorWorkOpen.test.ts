@@ -5,9 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVisitorWorkOpen } from './useVisitorWorkOpen';
 
 const openFilePreview = vi.fn();
-const { openGalleryModal } = vi.hoisted(() => ({ openGalleryModal: vi.fn() }));
+const { openCollectionModal } = vi.hoisted(() => ({ openCollectionModal: vi.fn() }));
 
-vi.mock('@/features/GalleryModal/loader', () => ({ openGalleryModal }));
+vi.mock('@/features/CollectionModal/loader', () => ({ openCollectionModal }));
 const conversationState = { context: { agentShareId: 'share_1', topicId: 'tpc_1' } };
 
 vi.mock('../../store', () => ({
@@ -35,25 +35,25 @@ const fileWork = (fileUrl?: string) =>
 describe('useVisitorWorkOpen', () => {
   beforeEach(() => {
     openFilePreview.mockReset();
-    openGalleryModal.mockReset();
+    openCollectionModal.mockReset();
   });
 
-  it('opens a gallery with the images its card carries, and never asks for the versions', () => {
+  it('opens a collection with the images its card carries, and never asks for the versions', () => {
     const items = [{ fileId: 'file_1', url: 'https://app.lobehub.com/f/file_1' }];
     const { result } = renderHook(() => useVisitorWorkOpen());
 
     result.current({
-      event: { metadata: { gallery: { items } } },
-      id: 'wk_gallery',
+      event: { metadata: { collection: { items } } },
+      id: 'wk_collection',
       title: 'Shelf',
-      type: 'gallery',
+      type: 'collection',
     } as unknown as WorkSummaryItem);
-    expect(openGalleryModal).toHaveBeenCalledWith({ items, title: 'Shelf' });
+    expect(openCollectionModal).toHaveBeenCalledWith({ items, title: 'Shelf' });
 
     // A row without images has nothing a visitor may load.
-    openGalleryModal.mockReset();
-    result.current({ id: 'wk_gallery', type: 'gallery' } as unknown as WorkSummaryItem);
-    expect(openGalleryModal).not.toHaveBeenCalled();
+    openCollectionModal.mockReset();
+    result.current({ id: 'wk_collection', type: 'collection' } as unknown as WorkSummaryItem);
+    expect(openCollectionModal).not.toHaveBeenCalled();
   });
 
   it('previews a file Work in the portal from its public URL instead of a new tab', () => {

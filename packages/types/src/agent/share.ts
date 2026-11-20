@@ -1,5 +1,5 @@
 import type { ShareVisibility } from '../topic';
-import type { GalleryWorkVersionMetadata, WorkItem } from '../work';
+import type { CollectionWorkVersionMetadata, WorkItem } from '../work';
 
 /** A creator-authored visitor task, independent of the agent's opening questions. */
 export interface AgentShareDemoCase {
@@ -22,8 +22,8 @@ export type SharedAgentWork = Pick<
   | 'updatedAt'
   | 'url'
 > & {
-  /** A gallery Work's images, so its card shows the count and opens the grid; `url` is the cover. */
-  gallery?: GalleryWorkVersionMetadata;
+  /** A collection Work's images, so its card shows the count and opens the grid; `url` is the cover. */
+  collection?: CollectionWorkVersionMetadata;
   totalCost: number | null;
 };
 

@@ -7,7 +7,7 @@ import { CheckCircle2Icon, GitPullRequestIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getGalleryCoverUrl, getWorkTypeDescriptor } from '@/features/Work/descriptors';
+import { getCollectionCoverUrl, getWorkTypeDescriptor } from '@/features/Work/descriptors';
 import LinearIcon from '@/features/Work/icons/LinearIcon';
 
 const styles = createStaticStyles(({ css }) => ({
@@ -64,7 +64,7 @@ const styles = createStaticStyles(({ css }) => ({
     background: color-mix(in srgb, ${cssVar.colorBgElevated} 88%, transparent);
     backdrop-filter: blur(12px);
   `,
-  galleryImage: css`
+  collectionImage: css`
     position: absolute;
     inset: 0;
 
@@ -197,12 +197,12 @@ const WorkPreview = memo<WorkPreviewProps>(({ item, title }) => {
   const isLinear = item.resourceType.startsWith('linear_');
   const taskStatus = item.resourceType === 'task' ? item.task.status : null;
   const status = item.status || taskStatus;
-  const galleryCover = item.type === 'gallery' ? getGalleryCoverUrl(item) : null;
+  const collectionCover = item.type === 'collection' ? getCollectionCoverUrl(item) : null;
 
-  if (galleryCover)
+  if (collectionCover)
     return (
       <div className={styles.cover}>
-        <img alt={title} className={styles.galleryImage} src={galleryCover} />
+        <img alt={title} className={styles.collectionImage} src={collectionCover} />
         <div className={styles.coverBadge}>
           <DescriptorIcon size={17} />
         </div>

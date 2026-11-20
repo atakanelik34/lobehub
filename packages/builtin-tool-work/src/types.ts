@@ -9,7 +9,7 @@ export const WorkApiName = {
 
 export type WorkApiNameType = (typeof WorkApiName)[keyof typeof WorkApiName];
 
-/** One gallery image as the model names it. */
+/** One collection image as the model names it. */
 export interface WorkImageArg {
   caption?: string;
   /** A `generationId` (`gen_…`) from image generation, a file id (`file_…`) or a `/f/file_…` link. */
@@ -17,13 +17,13 @@ export interface WorkImageArg {
 }
 
 export interface CreateWorkArgs {
-  /** One of `items[].image`; the first image when left out. Gallery only. */
+  /** One of `items[].image`; the first image when left out. Collection only. */
   coverImage?: string;
   description?: string;
-  /** Gallery images in display order. Required for a gallery. */
+  /** Collection images in display order. Required for a collection. */
   items?: WorkImageArg[];
   title: string;
-  type: 'gallery' | 'link';
+  type: 'collection' | 'link';
   /** http(s) link. Required for a link. */
   url?: string;
 }
@@ -31,7 +31,7 @@ export interface CreateWorkArgs {
 export interface UpdateWorkArgs {
   coverImage?: string;
   description?: string;
-  /** The complete new image list; replaces the current one. Gallery only. */
+  /** The complete new image list; replaces the current one. Collection only. */
   items?: WorkImageArg[];
   title?: string;
   workId: string;
@@ -43,10 +43,10 @@ export interface DeleteWorkArgs {
 
 /** A Work as the model and the inspector see it after a create or update. */
 export interface WorkSummary {
-  /** Number of images; gallery only. */
+  /** Number of images; collection only. */
   imageCount?: number;
   title: string | null;
-  type: 'gallery' | 'link';
+  type: 'collection' | 'link';
   url?: string | null;
   workId: string;
 }

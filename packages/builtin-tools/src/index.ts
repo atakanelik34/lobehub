@@ -279,8 +279,8 @@ export const AGENT_SHARE_ALLOWED_BUILTIN_IDENTIFIERS = new Set<string>([
   // {@link AGENT_SHARE_IMPLIED_BUILTIN_IDENTIFIERS}). Its runtime takes the run
   // (operation, topic, tool call) from the execution context only, writes under
   // the share scope pinned to the visitor topic (`resolveRunWorkAccessScope`),
-  // and changes or deletes only Works this conversation created. Gallery images
-  // must be generated images or run outputs (`resolveAgentWorkGalleryItems`).
+  // and changes or deletes only Works this conversation created. Collection images
+  // must be generated images or run outputs (`resolveAgentWorkCollectionItems`).
   // See the allowed-builtins section of `shareGate/README.md`.
   WorkManifest.identifier,
 ]);
@@ -480,7 +480,7 @@ const builtinToolRegistry: LobeBuiltinTool[] = [
   },
   {
     // On demand: hidden and absent from the defaults, but discoverable, so the activator enables
-    // it when the agent has a gallery or a published link to show. A share visitor's run gets it
+    // it when the agent has a collection or a published link to show. A share visitor's run gets it
     // without a creator grant (see `shareGate/grants.ts`): its Works stay in the visitor's topic.
     hidden: true,
     identifier: WorkManifest.identifier,

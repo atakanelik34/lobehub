@@ -154,8 +154,8 @@ const workTypeKey = (item: WorkSummaryItem) => {
     case 'file': {
       return 'work.type.file';
     }
-    case 'gallery': {
-      return 'work.type.gallery';
+    case 'collection': {
+      return 'work.type.collection';
     }
     case 'github_issue': {
       return 'work.type.githubIssue';

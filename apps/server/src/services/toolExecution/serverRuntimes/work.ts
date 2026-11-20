@@ -9,8 +9,8 @@ import type { AgentWorkRunContext, WorkItem } from '@lobechat/types';
 import { AgentWorkError, WorkModel } from '@/database/models/work';
 import {
   AgentWorkRunError,
-  parseGalleryImageRef,
-  resolveAgentWorkGalleryItems,
+  parseCollectionImageRef,
+  resolveAgentWorkCollectionItems,
   resolveRunWorkAccessScope,
 } from '@/server/services/workRegistration';
 
@@ -53,13 +53,13 @@ const guarded =
 const summarize = (work: WorkItem, imageCount?: number): WorkSummary => ({
   ...(imageCount === undefined ? {} : { imageCount }),
   title: work.title ?? null,
-  type: work.type === 'gallery' ? 'gallery' : 'link',
+  type: work.type === 'collection' ? 'collection' : 'link',
   url: work.url ?? null,
   workId: work.id,
 });
 
 /**
- * The `lobe-work` tools: the agent registers galleries and links it produced
+ * The `lobe-work` tools: the agent registers collections and links it produced
  * as Works of this run. The run (conversation, operation, tool call) comes
  * from the execution context, never from the model, and the agent can change
  * only the Works it created in this conversation (`findAgentManagedWork`).
@@ -97,11 +97,11 @@ export const createWorkToolService = (context: ToolExecutionContext): WorkToolSe
     userId,
   };
 
-  const resolveGallery = async (
+  const resolveCollection = async (
     items: { caption?: string; image: string }[],
     coverImage?: string,
   ) => {
-    const resolved = await resolveAgentWorkGalleryItems({
+    const resolved = await resolveAgentWorkCollectionItems({
       db,
       items,
       userId,
@@ -110,9 +110,9 @@ export const createWorkToolService = (context: ToolExecutionContext): WorkToolSe
     });
     // The cover names one of the items the same way; map it to that item's
     // file. A cover outside the list stays as named and is refused as such.
-    const coverRef = coverImage ? parseGalleryImageRef(coverImage) : undefined;
+    const coverRef = coverImage ? parseCollectionImageRef(coverImage) : undefined;
     const coverIndex = coverRef
-      ? items.findIndex(({ image }) => parseGalleryImageRef(image) === coverRef)
+      ? items.findIndex(({ image }) => parseCollectionImageRef(image) === coverRef)
       : -1;
     const coverFileId = coverIndex >= 0 ? resolved[coverIndex].fileId : coverRef;
     return { ...(coverFileId ? { coverFileId } : {}), items: resolved };
@@ -129,28 +129,30 @@ export const createWorkToolService = (context: ToolExecutionContext): WorkToolSe
         });
         return summarize(work);
       }
-      const gallery = await resolveGallery(args.items ?? [], args.coverImage);
+      const collection = await resolveCollection(args.items ?? [], args.coverImage);
       const work = await workModel.createAgentWork(run, {
-        ...gallery,
+        ...collection,
         description: args.description,
         title: args.title,
-        type: 'gallery',
+        type: 'collection',
       });
-      return summarize(work, gallery.items.length);
+      return summarize(work, collection.items.length);
     }),
     delete: guarded(async (workId) => {
       const deleted = await workModel.deleteAgentWork(run, workId);
       return { title: deleted.title, workId: deleted.id };
     }),
     update: guarded(async (args) => {
-      const gallery = args.items ? await resolveGallery(args.items, args.coverImage) : undefined;
+      const collection = args.items
+        ? await resolveCollection(args.items, args.coverImage)
+        : undefined;
       const work = await workModel.updateAgentWork(run, {
         description: args.description,
-        gallery,
+        collection,
         title: args.title,
         workId: args.workId,
       });
-      return summarize(work, gallery?.items.length);
+      return summarize(work, collection?.items.length);
     }),
   };
 };

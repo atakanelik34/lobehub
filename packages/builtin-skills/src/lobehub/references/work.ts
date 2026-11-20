@@ -32,7 +32,7 @@ web page. Users find their Works on the reply and in the resource library.
   when you create or edit them, and \`lh work create\` refuses their links.
 - Works registered automatically cannot be changed with \`lh work update\` or deleted with
   \`lh work delete\`.
-- Several images in one card: use the \`lobe-work\` tool's \`createWork\` with \`type: gallery\`
+- Several images in one card: use the \`lobe-work\` tool's \`createWork\` with \`type: collection\`
   instead of one file Work per image.
 `;
 

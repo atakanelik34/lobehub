@@ -1,5 +1,5 @@
 import type {
-  GalleryWorkVersionMetadata,
+  CollectionWorkVersionMetadata,
   SharedAgentDeliveryStats,
   SharedAgentWork,
   WorkVersionMetadata,
@@ -49,23 +49,23 @@ const outsideAgentScope = (workspaceId: AnyColumn) =>
   sql`${workspaceId} is distinct from ${agents.workspaceId}`;
 
 /**
- * The images of a gallery Work, the only file links a share profile exposes:
- * featuring a gallery is choosing to show its images. Each keeps only an
+ * The images of a collection Work, the only file links a share profile exposes:
+ * featuring a collection is choosing to show its images. Each keeps only an
  * http(s) URL.
  */
-const toSharedGallery = (
+const toSharedCollection = (
   metadata: WorkVersionMetadata | null,
-): GalleryWorkVersionMetadata | undefined => {
-  const gallery = metadata?.gallery;
-  if (!gallery) return undefined;
-  const items = gallery.items.flatMap(({ caption, fileId, mimeType, url }) => {
+): CollectionWorkVersionMetadata | undefined => {
+  const collection = metadata?.collection;
+  if (!collection) return undefined;
+  const items = collection.items.flatMap(({ caption, fileId, mimeType, url }) => {
     const safeUrl = sanitizeExternalUrl(url);
     if (!safeUrl) return [];
     return [
       { ...(caption ? { caption } : {}), fileId, ...(mimeType ? { mimeType } : {}), url: safeUrl },
     ];
   });
-  return { ...(gallery.coverFileId ? { coverFileId: gallery.coverFileId } : {}), items };
+  return { ...(collection.coverFileId ? { coverFileId: collection.coverFileId } : {}), items };
 };
 
 /** Owner-scoped source for explicitly curated share profiles, not a general resource grant. */
@@ -145,7 +145,7 @@ export class AgentShareProfileModel {
           ),
           ids ? inArray(works.id, ids) : undefined,
           or(
-            inArray(works.type, ['external', 'file', 'gallery']),
+            inArray(works.type, ['external', 'file', 'collection']),
             and(
               eq(works.type, 'document'),
               exists(
@@ -204,19 +204,20 @@ export class AgentShareProfileModel {
     );
     const byId = new Map(
       rows.map(({ deliveredAt: _deliveredAt, versionMetadata, ...work }) => {
-        const gallery = work.type === 'gallery' ? toSharedGallery(versionMetadata) : undefined;
+        const collection =
+          work.type === 'collection' ? toSharedCollection(versionMetadata) : undefined;
         return [
           work.id,
           {
             ...work,
-            ...(gallery ? { gallery } : {}),
+            ...(collection ? { collection } : {}),
             totalCost: costs.get(work.id) ?? null,
             /**
              * File URLs can be bearer download links; featuring a file Work is not a
-             * download grant. A gallery's URL is its cover, shown with its images.
+             * download grant. A collection's URL is its cover, shown with its images.
              */
             url:
-              work.type === 'external' || work.type === 'gallery'
+              work.type === 'external' || work.type === 'collection'
                 ? (sanitizeExternalUrl(work.url) ?? null)
                 : null,
           },
@@ -262,12 +263,13 @@ export class AgentShareProfileModel {
     );
     const byId = new Map(
       allRows.map(({ deliveredAt: _deliveredAt, versionMetadata, ...work }) => {
-        const gallery = work.type === 'gallery' ? toSharedGallery(versionMetadata) : undefined;
+        const collection =
+          work.type === 'collection' ? toSharedCollection(versionMetadata) : undefined;
         return [
           work.id,
           {
             ...work,
-            ...(gallery ? { gallery } : {}),
+            ...(collection ? { collection } : {}),
             totalCost: costs.get(work.id) ?? null,
             url: sanitizeExternalUrl(work.url) ?? null,
           },

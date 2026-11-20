@@ -10,7 +10,7 @@ const workId = {
 
 const items = {
   description:
-    'Gallery images in display order. Each image is the generationId (gen_…) an image generation result lists, or a file id (file_…) or /f/file_… link.',
+    'Collection images in display order. Each image is the generationId (gen_…) an image generation result lists, or a file id (file_…) or /f/file_… link.',
   items: {
     properties: {
       caption: { description: 'Short caption shown with the image.', type: 'string' },
@@ -42,21 +42,21 @@ export const WorkManifest: BuiltinToolManifest = {
     avatar: '🗂️',
     title: 'Works',
     description:
-      'Show what you produced as a Work card under your reply: a gallery of images or a published link. Change or delete Works you created.',
+      'Show what you produced as a Work card under your reply: a collection of images (more media types later) or a published link. Change or delete Works you created.',
   },
   api: [
     {
       name: WorkApiName.createWork,
       humanIntervention: 'never',
       description:
-        'Create a Work card under your reply. type "gallery" collects several images into one card; type "link" registers an http(s) page you published. Returns the workId.',
+        'Create a Work card under your reply. type "collection" collects several images into one card; type "link" registers an http(s) page you published. Returns the workId.',
       parameters: {
         properties: {
           coverImage,
           description,
           items,
           title: { description: 'Card title.', type: 'string' },
-          type: { enum: ['gallery', 'link'], type: 'string' },
+          type: { enum: ['collection', 'link'], type: 'string' },
           url: { description: 'http(s) link; required for type "link".', type: 'string' },
         },
         required: ['type', 'title'],
@@ -67,7 +67,7 @@ export const WorkManifest: BuiltinToolManifest = {
       name: WorkApiName.updateWork,
       humanIntervention: 'never',
       description:
-        'Save a new version of a Work you created. items replaces the whole image list of a gallery; fields left out keep their values. A link keeps its URL.',
+        'Save a new version of a Work you created. items replaces the whole image list of a collection; fields left out keep their values. A link keeps its URL.',
       parameters: {
         properties: {
           coverImage,

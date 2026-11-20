@@ -94,7 +94,7 @@ describe('WorkModel · queries', () => {
       });
 
       // One query per work type across all ids, not per (id x type). Six
-      // registered types now: canvas / document / external / file / gallery / task.
+      // registered types now: canvas / document / external / file / collection / task.
       expect(selectSpy).toHaveBeenCalledTimes(6);
       expect(byOperations['op-batch-1']?.map((item) => item.resourceId)).toEqual([firstTask.id]);
       expect(byOperations['op-batch-2']?.map((item) => item.resourceId)).toEqual([secondTask.id]);

@@ -222,8 +222,8 @@ absence of a known exploit.
   3. `updateWork` / `deleteWork` reach only Works this conversation created
      through the tool or `lh work` (`agentEditable`), never ones collected
      automatically or made in another conversation;
-  4. gallery images must be generated images or run outputs of the run's
-     account (`resolveAgentWorkGalleryItems`), and in a visitor run each image
+  4. collection images must be generated images or run outputs of the run's
+     account (`resolveAgentWorkCollectionItems`), and in a visitor run each image
      must also appear in a message of the visitor topic (`visitorTopicId`), so
      a guessed id of another creator image is refused as not found.
 

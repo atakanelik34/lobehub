@@ -70,12 +70,12 @@ describe('MessageModel · work summary attachment', () => {
     await serverDB.insert(messages).values({
       content: '',
       id: 'msg-anchor',
-      metadata: { work: { rootOperationId: 'op-gallery' } },
+      metadata: { work: { rootOperationId: 'op-collection' } },
       role: 'assistant',
       topicId,
       userId,
     });
-    const run = { operationId: 'op-gallery', topicId, userId };
+    const run = { operationId: 'op-collection', topicId, userId };
     const work = await workModel.createAgentWork(run, {
       title: 'Preview',
       type: 'link',

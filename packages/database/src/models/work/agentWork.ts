@@ -1,22 +1,22 @@
 import type {
   AgentWorkRunContext,
+  CollectionWorkVersionMetadata,
   CreateAgentWorkInput,
-  GalleryWorkVersionMetadata,
   UpdateAgentWorkInput,
   WorkDisplayField,
   WorkItem,
   WorkVersionCumulativeUsage,
   WorkVersionMetadata,
 } from '@lobechat/types';
-import { AGENT_WORK_CLI_TOOL_IDENTIFIER, GALLERY_WORK_MAX_ITEMS } from '@lobechat/types';
+import { AGENT_WORK_CLI_TOOL_IDENTIFIER, COLLECTION_WORK_MAX_ITEMS } from '@lobechat/types';
 import { and, eq, exists, inArray, isNull } from 'drizzle-orm';
 
 import { works, workVersions } from '../../schemas/work';
 import { idGenerator } from '../../utils/idGenerator';
+import { collectionCoverUrl } from './collection';
 import { type WorkContext, workOwnership } from './context';
 import { registerExternalWork } from './external';
 import { fileBasename, fileWorkResourceId, registerFileWork } from './file';
-import { galleryCoverUrl } from './gallery';
 import { sanitizeExternalUrl } from './toolResultParsing';
 import { registerWorkVersion } from './writes';
 
@@ -106,30 +106,30 @@ const assertValidText = (input: {
   }
 };
 
-/** Check a gallery's image list before it is stored as a version. */
-const assertValidGallery = (gallery: GalleryWorkVersionMetadata) => {
-  if (gallery.items.length === 0) {
-    throw new AgentWorkError('BAD_REQUEST', 'A gallery needs at least one image');
+/** Check a collection's image list before it is stored as a version. */
+const assertValidCollection = (collection: CollectionWorkVersionMetadata) => {
+  if (collection.items.length === 0) {
+    throw new AgentWorkError('BAD_REQUEST', 'A collection needs at least one image');
   }
-  if (gallery.items.length > GALLERY_WORK_MAX_ITEMS) {
+  if (collection.items.length > COLLECTION_WORK_MAX_ITEMS) {
     throw new AgentWorkError(
       'BAD_REQUEST',
-      `A gallery holds at most ${GALLERY_WORK_MAX_ITEMS} images`,
+      `A collection holds at most ${COLLECTION_WORK_MAX_ITEMS} images`,
     );
   }
-  const fileIds = new Set(gallery.items.map((item) => item.fileId));
-  if (fileIds.size !== gallery.items.length) {
-    throw new AgentWorkError('BAD_REQUEST', 'Each image may appear in a gallery only once');
+  const fileIds = new Set(collection.items.map((item) => item.fileId));
+  if (fileIds.size !== collection.items.length) {
+    throw new AgentWorkError('BAD_REQUEST', 'Each image may appear in a collection only once');
   }
-  if (gallery.coverFileId && !fileIds.has(gallery.coverFileId)) {
-    throw new AgentWorkError('BAD_REQUEST', 'The cover must be one of the gallery images');
+  if (collection.coverFileId && !fileIds.has(collection.coverFileId)) {
+    throw new AgentWorkError('BAD_REQUEST', 'The cover must be one of the collection images');
   }
 };
 
-const galleryMetadata = (gallery: GalleryWorkVersionMetadata): WorkVersionMetadata => ({
-  gallery: {
-    ...(gallery.coverFileId ? { coverFileId: gallery.coverFileId } : {}),
-    items: gallery.items.map((item) => ({
+const collectionMetadata = (collection: CollectionWorkVersionMetadata): WorkVersionMetadata => ({
+  collection: {
+    ...(collection.coverFileId ? { coverFileId: collection.coverFileId } : {}),
+    items: collection.items.map((item) => ({
       ...(item.caption ? { caption: item.caption } : {}),
       fileId: item.fileId,
       ...(item.mimeType ? { mimeType: item.mimeType } : {}),
@@ -183,7 +183,7 @@ export const createAgentWork = async (
 ): Promise<WorkItem> => {
   assertValidText({
     description: input.description,
-    items: input.type === 'gallery' ? input.items : undefined,
+    items: input.type === 'collection' ? input.items : undefined,
     title: input.title,
   });
   if (input.type === 'file') {
@@ -211,16 +211,16 @@ export const createAgentWork = async (
     });
   }
 
-  if (input.type === 'gallery') {
-    assertValidGallery(input);
-    // Every create is a new gallery: images are added to an existing one with
+  if (input.type === 'collection') {
+    assertValidCollection(input);
+    // Every create is a new collection: images are added to an existing one with
     // an update, which replaces its whole list.
     return registerWorkVersion(
       ctx,
       {
-        resourceId: idGenerator('galleries'),
-        resourceType: 'gallery',
-        type: 'gallery',
+        resourceId: idGenerator('collections'),
+        resourceType: 'collection',
+        type: 'collection',
         userId: run.userId,
         visibility: 'private',
       },
@@ -229,9 +229,9 @@ export const createAgentWork = async (
         display: {
           description: input.description ?? null,
           title: input.title,
-          url: galleryCoverUrl(input),
+          url: collectionCoverUrl(input),
         },
-        metadata: galleryMetadata(input),
+        metadata: collectionMetadata(input),
       }),
     );
   }
@@ -256,12 +256,12 @@ export const createAgentWork = async (
 /** Work types an agent may change or delete after creating them. */
 const isAgentManagedWork = (work: { resourceType: string; type: string }) =>
   work.type === 'file' ||
-  work.type === 'gallery' ||
+  work.type === 'collection' ||
   (work.type === 'external' && work.resourceType === 'link');
 
 /**
  * Find a Work this run may change or delete: an `agentEditable` file, link or
- * gallery Work of the same creator, produced in this run's conversation.
+ * collection Work of the same creator, produced in this run's conversation.
  */
 const findAgentManagedWork = async (ctx: WorkContext, run: AgentWorkRunContext, workId: string) => {
   const [work] = await ctx.db
@@ -297,7 +297,7 @@ const findAgentManagedWork = async (ctx: WorkContext, run: AgentWorkRunContext, 
   if (!isAgentManagedWork(work)) {
     throw new AgentWorkError(
       'BAD_REQUEST',
-      'Only file, link and gallery Works can be changed this way; update the task or document itself',
+      'Only file, link and collection Works can be changed this way; update the task or document itself',
     );
   }
   return { ...work, resourceId: work.resourceId };
@@ -306,7 +306,7 @@ const findAgentManagedWork = async (ctx: WorkContext, run: AgentWorkRunContext, 
 /**
  * Add a version to a Work the agent created (`lh work update`, `lobe-work`
  * `updateWork`). Only Works stamped `agentEditable` at creation qualify;
- * fields left out keep their current values. A gallery update replaces the
+ * fields left out keep their current values. A collection update replaces the
  * whole image list.
  */
 export const updateAgentWork = async (
@@ -319,20 +319,20 @@ export const updateAgentWork = async (
   if (input.file && work.type !== 'file') {
     throw new AgentWorkError('BAD_REQUEST', 'Only a file Work takes a new file');
   }
-  if (input.gallery && work.type !== 'gallery') {
-    throw new AgentWorkError('BAD_REQUEST', 'Only a gallery Work takes images');
+  if (input.collection && work.type !== 'collection') {
+    throw new AgentWorkError('BAD_REQUEST', 'Only a collection Work takes images');
   }
-  if (input.gallery) assertValidGallery(input.gallery);
+  if (input.collection) assertValidCollection(input.collection);
   assertValidText({
     description: input.description,
-    items: input.gallery?.items,
+    items: input.collection?.items,
     title: input.title,
   });
 
   const patchFields: WorkDisplayField[] = [];
   if (input.title !== undefined) patchFields.push('title');
   if (input.description !== undefined) patchFields.push('description');
-  if (input.file || input.gallery) patchFields.push('url');
+  if (input.file || input.collection) patchFields.push('url');
   if (patchFields.length === 0) {
     throw new AgentWorkError('BAD_REQUEST', 'Nothing to update');
   }
@@ -345,8 +345,8 @@ export const updateAgentWork = async (
       fileUrl: input.file.fileUrl,
       mimeType: input.file.mimeType,
     };
-  } else if (input.gallery) {
-    metadata = galleryMetadata(input.gallery);
+  } else if (input.collection) {
+    metadata = collectionMetadata(input.collection);
   }
 
   return registerWorkVersion(
@@ -363,7 +363,9 @@ export const updateAgentWork = async (
       display: {
         description: input.description,
         title: input.title,
-        url: input.file?.fileUrl ?? (input.gallery ? galleryCoverUrl(input.gallery) : undefined),
+        url:
+          input.file?.fileUrl ??
+          (input.collection ? collectionCoverUrl(input.collection) : undefined),
       },
       metadata,
       // A file- or image-only update patches `url`, so it records a version

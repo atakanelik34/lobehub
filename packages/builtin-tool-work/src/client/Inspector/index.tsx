@@ -19,7 +19,7 @@ type InspectorState = Partial<DeleteWorkState & WorkState & WorkToolErrorState>;
 /**
  * The header line of every Work call: the action, the Work's title once known
  * (from the arguments while they stream, from the result afterwards), then the
- * gallery's image count or a failure mark. One component for all APIs.
+ * collection's image count or a failure mark. One component for all APIs.
  */
 const WorkInspector = ({
   apiName,

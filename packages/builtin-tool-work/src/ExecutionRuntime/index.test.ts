@@ -13,7 +13,7 @@ const service = (overrides: Partial<WorkToolService> = {}): WorkToolService => (
   update: vi.fn(async (args) => ({
     imageCount: args.items?.length,
     title: args.title ?? 'Covers',
-    type: 'gallery' as const,
+    type: 'collection' as const,
     workId: args.workId,
   })),
   ...overrides,
@@ -22,32 +22,32 @@ const service = (overrides: Partial<WorkToolService> = {}): WorkToolService => (
 const images = [{ image: 'file_a' }, { caption: 'Night', image: 'file_b' }];
 
 describe('WorkExecutionRuntime', () => {
-  it('creates a gallery and names its id, title and image count', async () => {
+  it('creates a collection and names its id, title and image count', async () => {
     const runtime = new WorkExecutionRuntime(service());
-    const result = await runtime.createWork({ items: images, title: 'Covers', type: 'gallery' });
+    const result = await runtime.createWork({ items: images, title: 'Covers', type: 'collection' });
 
     expect(result.success).toBe(true);
     expect(result.content).toContain('wk_1');
     expect(result.content).toContain('"Covers"');
     expect(result.content).toContain('2 images');
     expect(result.state).toEqual({
-      work: { imageCount: 2, title: 'Covers', type: 'gallery', workId: 'wk_1' },
+      work: { imageCount: 2, title: 'Covers', type: 'collection', workId: 'wk_1' },
     });
   });
 
-  it('refuses a gallery without images and a link without a url, before writing', async () => {
+  it('refuses a collection without images and a link without a url, before writing', async () => {
     const svc = service();
     const runtime = new WorkExecutionRuntime(svc);
 
-    const gallery = await runtime.createWork({ title: 'Covers', type: 'gallery' });
+    const collection = await runtime.createWork({ title: 'Covers', type: 'collection' });
     const link = await runtime.createWork({ title: 'Site', type: 'link' });
 
-    expect(gallery.error?.type).toBe('invalid_input');
+    expect(collection.error?.type).toBe('invalid_input');
     expect(link.error?.type).toBe('invalid_input');
     expect(svc.create).not.toHaveBeenCalled();
   });
 
-  it('refuses an update that changes nothing or empties the gallery', async () => {
+  it('refuses an update that changes nothing or empties the collection', async () => {
     const svc = service();
     const runtime = new WorkExecutionRuntime(svc);
 

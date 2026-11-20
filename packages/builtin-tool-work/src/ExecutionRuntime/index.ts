@@ -68,14 +68,14 @@ export class WorkExecutionRuntime {
   createWork = (args: CreateWorkArgs) =>
     this.result<WorkState>(async () => {
       if (!args?.title?.trim()) throw invalid('A Work needs a title.');
-      if (args.type === 'gallery') {
-        if (!args.items?.length) throw invalid('A gallery needs at least one image in items.');
-        if (args.url) throw invalid('A gallery takes images in items, not a url.');
+      if (args.type === 'collection') {
+        if (!args.items?.length) throw invalid('A collection needs at least one image in items.');
+        if (args.url) throw invalid('A collection takes images in items, not a url.');
       } else if (args.type === 'link') {
         if (!args.url) throw invalid('A link Work needs a url.');
         if (args.items?.length || args.coverImage) throw invalid('A link Work takes no images.');
       } else {
-        throw invalid('type must be "gallery" or "link".');
+        throw invalid('type must be "collection" or "link".');
       }
       const work = await this.service.create(args);
       return { content: describeWork('Created', work), state: { work } };

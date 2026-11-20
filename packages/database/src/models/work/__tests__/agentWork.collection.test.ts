@@ -1,5 +1,5 @@
 // @vitest-environment node
-import type { AgentWorkRunContext, GalleryWorkImage } from '@lobechat/types';
+import type { AgentWorkRunContext, CollectionWorkItem } from '@lobechat/types';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -22,15 +22,15 @@ afterEach(cleanupWorkTestData);
 const run: AgentWorkRunContext = {
   agentId,
   messageId: null,
-  operationId: 'op-gallery',
+  operationId: 'op-collection',
   threadId,
-  toolCallId: 'call-gallery-1',
+  toolCallId: 'call-collection-1',
   toolIdentifier: 'lobe-work',
   topicId,
   userId,
 };
 
-const image = (n: number, caption?: string): GalleryWorkImage => ({
+const image = (n: number, caption?: string): CollectionWorkItem => ({
   caption,
   fileId: `file-cd-${n}`,
   mimeType: 'image/png',
@@ -45,29 +45,29 @@ const expectAgentWorkError = async (promise: Promise<unknown>, code: AgentWorkEr
   expect((error as AgentWorkError).code).toBe(code);
 };
 
-const createGallery = (overrides: Partial<AgentWorkRunContext> = {}) =>
+const createCollection = (overrides: Partial<AgentWorkRunContext> = {}) =>
   workModel().createAgentWork(
     { ...run, ...overrides },
     {
       coverFileId: 'file-cd-2',
       items: [image(1, 'Apple'), image(2, 'Microsoft')],
       title: 'Top ten CD shelf',
-      type: 'gallery',
+      type: 'collection',
     },
   );
 
-describe('WorkModel · agent galleries', () => {
-  it('creates a gallery whose card shows the cover and whose version holds every image', async () => {
-    const work = await createGallery();
+describe('WorkModel · agent collections', () => {
+  it('creates a collection whose card shows the cover and whose version holds every image', async () => {
+    const work = await createCollection();
 
     expect(work).toMatchObject({
-      resourceType: 'gallery',
+      resourceType: 'collection',
       title: 'Top ten CD shelf',
       toolIdentifier: 'lobe-work',
-      type: 'gallery',
+      type: 'collection',
       url: 'https://app.example.com/f/file-cd-2',
     });
-    expect(work.resourceId).toMatch(/^gal_/);
+    expect(work.resourceId).toMatch(/^col_/);
     const [row] = await serverDB.select().from(works).where(eq(works.id, work.id));
     expect(row.metadata).toEqual({ agentEditable: true });
 
@@ -77,7 +77,7 @@ describe('WorkModel · agent galleries', () => {
       rootOperationId: run.operationId,
       toolCallId: run.toolCallId,
     });
-    expect(version.metadata?.gallery).toEqual({
+    expect(version.metadata?.collection).toEqual({
       coverFileId: 'file-cd-2',
       items: [
         { caption: 'Apple', fileId: 'file-cd-1', mimeType: 'image/png', url: image(1).url },
@@ -95,20 +95,20 @@ describe('WorkModel · agent galleries', () => {
     expect(legacy).toEqual([]);
   });
 
-  it('makes every create a new gallery', async () => {
-    const first = await createGallery();
-    const second = await createGallery({ toolCallId: 'call-gallery-2' });
+  it('makes every create a new collection', async () => {
+    const first = await createCollection();
+    const second = await createCollection({ toolCallId: 'call-collection-2' });
     expect(second.id).not.toBe(first.id);
   });
 
   it('rejects an empty list, repeated images and a cover outside the list', async () => {
-    for (const gallery of [
+    for (const collection of [
       { items: [] },
       { items: [image(1), image(1)] },
       { coverFileId: 'file-cd-9', items: [image(1)] },
     ]) {
       await expectAgentWorkError(
-        workModel().createAgentWork(run, { ...gallery, title: 'Bad', type: 'gallery' }),
+        workModel().createAgentWork(run, { ...collection, title: 'Bad', type: 'collection' }),
         'BAD_REQUEST',
       );
     }
@@ -120,7 +120,7 @@ describe('WorkModel · agent galleries', () => {
       workModel().createAgentWork(run, {
         items: [{ ...image(1), caption: 'x'.repeat(501) }],
         title: 'Shelf',
-        type: 'gallery',
+        type: 'collection',
       }),
       'BAD_REQUEST',
     );
@@ -132,21 +132,21 @@ describe('WorkModel · agent galleries', () => {
       }),
       'BAD_REQUEST',
     );
-    const gallery = await createGallery();
+    const collection = await createCollection();
     for (const patch of [{ title: ' ' }, { description: 'x'.repeat(2001) }]) {
       await expectAgentWorkError(
-        workModel().updateAgentWork(run, { ...patch, workId: gallery.id }),
+        workModel().updateAgentWork(run, { ...patch, workId: collection.id }),
         'BAD_REQUEST',
       );
     }
   });
 
   it('replaces the whole image list on update and keeps the title', async () => {
-    const created = await createGallery();
+    const created = await createCollection();
 
     const updated = await workModel().updateAgentWork(
-      { ...run, toolCallId: 'call-gallery-update' },
-      { gallery: { items: [image(3, 'Nvidia'), image(1, 'Apple')] }, workId: created.id },
+      { ...run, toolCallId: 'call-collection-update' },
+      { collection: { items: [image(3, 'Nvidia'), image(1, 'Apple')] }, workId: created.id },
     );
 
     // No cover named: the first image becomes the cover.
@@ -154,7 +154,7 @@ describe('WorkModel · agent galleries', () => {
     const versions = await workModel().listVersions(created.id);
     expect(versions).toHaveLength(2);
     const latest = versions.find((version) => version.changeType === 'updated');
-    expect(latest?.metadata?.gallery).toEqual({
+    expect(latest?.metadata?.collection).toEqual({
       items: [
         { caption: 'Nvidia', fileId: 'file-cd-3', mimeType: 'image/png', url: image(3).url },
         { caption: 'Apple', fileId: 'file-cd-1', mimeType: 'image/png', url: image(1).url },
@@ -162,7 +162,7 @@ describe('WorkModel · agent galleries', () => {
     });
 
     const renamed = await workModel().updateAgentWork(
-      { ...run, toolCallId: 'call-gallery-rename' },
+      { ...run, toolCallId: 'call-collection-rename' },
       { title: 'Shelf v2', workId: created.id },
     );
     expect(renamed).toMatchObject({ title: 'Shelf v2', url: image(3).url });
@@ -170,14 +170,14 @@ describe('WorkModel · agent galleries', () => {
       (a, b) => a.version - b.version,
     );
     // A title-only update carries the images over.
-    expect(third.metadata?.gallery?.items.map((item) => item.fileId)).toEqual([
+    expect(third.metadata?.collection?.items.map((item) => item.fileId)).toEqual([
       'file-cd-3',
       'file-cd-1',
     ]);
   });
 
-  it('gives images only to a gallery, and a gallery no file', async () => {
-    const gallery = await createGallery();
+  it('gives images only to a collection, and a collection no file', async () => {
+    const collection = await createCollection();
     const link = await workModel().createAgentWork(run, {
       title: 'Preview',
       type: 'link',
@@ -185,13 +185,13 @@ describe('WorkModel · agent galleries', () => {
     });
 
     await expectAgentWorkError(
-      workModel().updateAgentWork(run, { gallery: { items: [image(1)] }, workId: link.id }),
+      workModel().updateAgentWork(run, { collection: { items: [image(1)] }, workId: link.id }),
       'BAD_REQUEST',
     );
     await expectAgentWorkError(
       workModel().updateAgentWork(run, {
         file: { fileId: 'file-x', fileUrl: 'https://app.example.com/f/file-x' },
-        workId: gallery.id,
+        workId: collection.id,
       }),
       'BAD_REQUEST',
     );
@@ -200,19 +200,19 @@ describe('WorkModel · agent galleries', () => {
 
 describe('WorkModel · deleting agent Works', () => {
   it('removes the Work card and its versions', async () => {
-    const gallery = await createGallery();
+    const collection = await createCollection();
     await workModel().updateAgentWork(
-      { ...run, toolCallId: 'call-gallery-update' },
-      { title: 'Renamed', workId: gallery.id },
+      { ...run, toolCallId: 'call-collection-update' },
+      { title: 'Renamed', workId: collection.id },
     );
 
-    expect(await workModel().deleteAgentWork(run, gallery.id)).toEqual({
-      id: gallery.id,
+    expect(await workModel().deleteAgentWork(run, collection.id)).toEqual({
+      id: collection.id,
       title: 'Renamed',
     });
-    expect(await serverDB.select().from(works).where(eq(works.id, gallery.id))).toEqual([]);
+    expect(await serverDB.select().from(works).where(eq(works.id, collection.id))).toEqual([]);
     expect(
-      await serverDB.select().from(workVersions).where(eq(workVersions.workId, gallery.id)),
+      await serverDB.select().from(workVersions).where(eq(workVersions.workId, collection.id)),
     ).toEqual([]);
   });
 
@@ -244,34 +244,34 @@ describe('WorkModel · deleting agent Works', () => {
   });
 
   it('refuses a run in another conversation or of another user', async () => {
-    const gallery = await createGallery();
-    const otherTopicId = 'work-gallery-other-topic';
+    const collection = await createCollection();
+    const otherTopicId = 'work-collection-other-topic';
     await serverDB.insert(topics).values({ id: otherTopicId, userId });
 
     await expectAgentWorkError(
-      workModel().deleteAgentWork({ ...run, topicId: otherTopicId }, gallery.id),
+      workModel().deleteAgentWork({ ...run, topicId: otherTopicId }, collection.id),
       'NOT_FOUND',
     );
     await expectAgentWorkError(
-      new WorkModel(serverDB, userId2).deleteAgentWork({ ...run, userId: userId2 }, gallery.id),
+      new WorkModel(serverDB, userId2).deleteAgentWork({ ...run, userId: userId2 }, collection.id),
       'NOT_FOUND',
     );
-    expect(await serverDB.select().from(works).where(eq(works.id, gallery.id))).toHaveLength(1);
+    expect(await serverDB.select().from(works).where(eq(works.id, collection.id))).toHaveLength(1);
   });
 
   it("gives the run's agent-written versions the run total once the run ends", async () => {
-    const gallery = await createGallery();
+    const collection = await createCollection();
     await workModel().updateAgentWork(
-      { ...run, toolCallId: 'call-gallery-2' },
-      { title: 'Renamed shelf', workId: gallery.id },
+      { ...run, toolCallId: 'call-collection-2' },
+      { title: 'Renamed shelf', workId: collection.id },
     );
     const scanned = await workModel().registerFile({
       cumulativeCost: 0.01,
       filePath: '/mnt/data/deck.pptx',
       metadata: { fileId: 'file-deck', filePath: '/mnt/data/deck.pptx' },
-      rootOperationId: 'op-gallery',
+      rootOperationId: 'op-collection',
       title: 'deck.pptx',
-      toolCallId: 'op:op-gallery',
+      toolCallId: 'op:op-collection',
       toolIdentifier: 'lobe-cloud-sandbox',
       toolName: 'writeFile',
       topicId,
@@ -282,7 +282,7 @@ describe('WorkModel · deleting agent Works', () => {
       workModel().fillAgentWorkCost({
         cumulativeCost: 0.25,
         cumulativeUsage: null,
-        rootOperationId: 'op-gallery',
+        rootOperationId: 'op-collection',
       });
     expect(await fill()).toBe(2);
     // A retried completion changes nothing.
@@ -291,7 +291,7 @@ describe('WorkModel · deleting agent Works', () => {
     const costs = await serverDB
       .select({ cost: workVersions.cumulativeCost, workId: workVersions.workId })
       .from(workVersions);
-    expect(costs.filter((row) => row.workId === gallery.id).map((row) => row.cost)).toEqual([
+    expect(costs.filter((row) => row.workId === collection.id).map((row) => row.cost)).toEqual([
       0.25, 0.25,
     ]);
     // A Work that already carries its own cost keeps it.

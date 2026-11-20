@@ -1,4 +1,4 @@
-import type { AgentWorkRunContext, GalleryWorkImage, WorkAccessScope } from '@lobechat/types';
+import type { AgentWorkRunContext, CollectionWorkItem, WorkAccessScope } from '@lobechat/types';
 import { FileSource } from '@lobechat/types';
 import { and, eq, or, sql } from 'drizzle-orm';
 
@@ -159,14 +159,17 @@ export const resolveAgentWorkFile = async (params: {
   };
 };
 
-/** Sources of the images a gallery may hold: generated images and run outputs. */
-const GALLERY_IMAGE_SOURCES = new Set<string>([FileSource.ImageGeneration, FileSource.ToolResult]);
+/** Sources of the images a collection may hold: generated images and run outputs. */
+const COLLECTION_IMAGE_SOURCES = new Set<string>([
+  FileSource.ImageGeneration,
+  FileSource.ToolResult,
+]);
 
 /**
- * The id an agent names a gallery image by: the `generationId` (`gen_…`) an
+ * The id an agent names a collection image by: the `generationId` (`gen_…`) an
  * image generation result lists, a bare `file_…` id, or a `/f/<id>` file link.
  */
-export const parseGalleryImageRef = (ref: string): string => {
+export const parseCollectionImageRef = (ref: string): string => {
   const value = ref.trim();
   if (!/^https?:\/\//i.test(value)) return value;
   try {
@@ -181,7 +184,7 @@ export const parseGalleryImageRef = (ref: string): string => {
 const isGenerationId = (id: string) => id.startsWith('gen_');
 
 /**
- * Resolve the images of a gallery to stored image entries. Each must be an
+ * Resolve the images of a collection to stored image entries. Each must be an
  * image the run's user generated or uploaded as run output; the URL the card
  * shows comes from the file row, never from the agent.
  *
@@ -190,20 +193,20 @@ const isGenerationId = (id: string) => id.startsWith('gen_');
  * conversation, so a visitor cannot pull the creator's other images into a
  * card by guessing their ids.
  */
-export const resolveAgentWorkGalleryItems = async (params: {
+export const resolveAgentWorkCollectionItems = async (params: {
   db: LobeChatDatabase;
   items: { caption?: string; image: string }[];
   userId: string;
   visitorTopicId?: string;
   workspaceId?: string;
-}): Promise<GalleryWorkImage[]> => {
+}): Promise<CollectionWorkItem[]> => {
   const { db, items, userId, visitorTopicId, workspaceId } = params;
   const fileModel = new FileModel(db, userId, workspaceId);
   const fileService = new FileService(db, userId, workspaceId);
 
   const files = await Promise.all(
     items.map(async ({ caption, image }) => {
-      const ref = parseGalleryImageRef(image);
+      const ref = parseCollectionImageRef(image);
       let fileId = ref;
       if (isGenerationId(ref)) {
         // Image generation results name the generation; its stored image is the file.
@@ -216,7 +219,7 @@ export const resolveAgentWorkGalleryItems = async (params: {
         fileId = generation.fileId;
       }
       const file = await fileModel.findById(fileId);
-      if (!file || file.userId !== userId || !GALLERY_IMAGE_SOURCES.has(file.source ?? '')) {
+      if (!file || file.userId !== userId || !COLLECTION_IMAGE_SOURCES.has(file.source ?? '')) {
         throw new AgentWorkRunError(`Image ${image} not found`, 404);
       }
       if (!file.fileType.startsWith('image/')) {

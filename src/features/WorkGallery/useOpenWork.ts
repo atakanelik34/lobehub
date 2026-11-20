@@ -3,8 +3,8 @@ import { useCallback } from 'react';
 
 import { taskDetailPath } from '@/features/AgentTasks/shared/taskDetailPath';
 import { openCanvasModal } from '@/features/CanvasModal/loader';
+import { openCollectionModal } from '@/features/CollectionModal/loader';
 import { openDocumentModal } from '@/features/DocumentModal/loader';
-import { openGalleryModal } from '@/features/GalleryModal/loader';
 import { getWorkTypeDescriptor, isSafeExternalUrl } from '@/features/Work/descriptors';
 import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 
@@ -40,8 +40,8 @@ export const useOpenWork = () => {
             window.open(openTarget.url, '_blank', 'noopener,noreferrer');
           return;
         }
-        case 'gallery': {
-          void openGalleryModal(openTarget);
+        case 'collection': {
+          void openCollectionModal(openTarget);
           return;
         }
         case 'task': {

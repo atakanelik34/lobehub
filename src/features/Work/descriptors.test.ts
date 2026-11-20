@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  getGalleryCoverUrl,
-  getGalleryFanUrls,
-  getGalleryImageCount,
+  getCollectionCoverUrl,
+  getCollectionFanUrls,
+  getCollectionImageCount,
   getWorkTypeDescriptor,
 } from './descriptors';
 
@@ -128,7 +128,7 @@ describe('getWorkTypeDescriptor', () => {
     });
   });
 
-  describe('gallery', () => {
+  describe('collection', () => {
     const image = (n: number) => ({
       fileId: `file-${n}`,
       mimeType: 'image/png',
@@ -136,17 +136,17 @@ describe('getWorkTypeDescriptor', () => {
     });
     const listRow = {
       description: null,
-      id: 'work-gallery-1',
+      id: 'work-collection-1',
       identifier: null,
-      resourceId: 'gal_1',
-      resourceType: 'gallery',
+      resourceId: 'col_1',
+      resourceType: 'collection',
       title: 'Top ten CD shelf',
-      type: 'gallery',
+      type: 'collection',
       url: 'https://app.example.com/f/file-2',
     };
     const summaryRow = {
       ...listRow,
-      event: { metadata: { gallery: { coverFileId: 'file-2', items: [image(1), image(2)] } } },
+      event: { metadata: { collection: { coverFileId: 'file-2', items: [image(1), image(2)] } } },
     };
 
     it('opens the viewer with the images a summary row carries', () => {
@@ -154,12 +154,12 @@ describe('getWorkTypeDescriptor', () => {
 
       expect(getWorkTypeDescriptor(item).getOpenTarget(item)).toEqual({
         items: [image(1), image(2)],
-        kind: 'gallery',
+        kind: 'collection',
         title: 'Top ten CD shelf',
-        workId: 'work-gallery-1',
+        workId: 'work-collection-1',
       });
-      expect(getGalleryImageCount(item)).toBe(2);
-      expect(getGalleryCoverUrl(item)).toBe(image(2).url);
+      expect(getCollectionImageCount(item)).toBe(2);
+      expect(getCollectionCoverUrl(item)).toBe(image(2).url);
     });
 
     it('leaves loading the images to the viewer for a list row', () => {
@@ -167,24 +167,24 @@ describe('getWorkTypeDescriptor', () => {
 
       expect(getWorkTypeDescriptor(item).getOpenTarget(item)).toEqual({
         items: undefined,
-        kind: 'gallery',
+        kind: 'collection',
         title: 'Top ten CD shelf',
-        workId: 'work-gallery-1',
+        workId: 'work-collection-1',
       });
-      expect(getGalleryImageCount(item)).toBeNull();
+      expect(getCollectionImageCount(item)).toBeNull();
       // List rows show the cover denormalized into works.url.
-      expect(getGalleryCoverUrl(item)).toBe('https://app.example.com/f/file-2');
+      expect(getCollectionCoverUrl(item)).toBe('https://app.example.com/f/file-2');
     });
 
     it('falls back to the first image without a named cover, and drops non-http(s) covers', () => {
       const firstImage = {
         ...summaryRow,
-        event: { metadata: { gallery: { items: [image(3), image(1)] } } },
+        event: { metadata: { collection: { items: [image(3), image(1)] } } },
       } as any;
-      expect(getGalleryCoverUrl(firstImage)).toBe(image(3).url);
+      expect(getCollectionCoverUrl(firstImage)).toBe(image(3).url);
 
       const unsafe = { ...listRow, url: 'javascript:alert(1)' } as any;
-      expect(getGalleryCoverUrl(unsafe)).toBeNull();
+      expect(getCollectionCoverUrl(unsafe)).toBeNull();
     });
 
     it('fans out up to three images with the cover in front', () => {
@@ -192,13 +192,13 @@ describe('getWorkTypeDescriptor', () => {
         ...summaryRow,
         event: {
           metadata: {
-            gallery: { coverFileId: 'file-3', items: [image(1), image(2), image(3), image(4)] },
+            collection: { coverFileId: 'file-3', items: [image(1), image(2), image(3), image(4)] },
           },
         },
       } as any;
-      expect(getGalleryFanUrls(four)).toEqual([image(3).url, image(1).url, image(2).url]);
+      expect(getCollectionFanUrls(four)).toEqual([image(3).url, image(1).url, image(2).url]);
       // A list row knows only the cover, so there is nothing to fan.
-      expect(getGalleryFanUrls(listRow as any)).toEqual(['https://app.example.com/f/file-2']);
+      expect(getCollectionFanUrls(listRow as any)).toEqual(['https://app.example.com/f/file-2']);
     });
   });
 

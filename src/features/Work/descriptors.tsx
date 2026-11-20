@@ -1,7 +1,7 @@
 import { classifyEditedFile, getBasename } from '@lobechat/builtin-tools/fileEditScan';
 import {
+  type CollectionWorkItem,
   type ExternalWorkResourceType,
-  type GalleryWorkImage,
   type ListedWorkType,
   type WorkListItem,
   workProviderOfResourceType,
@@ -134,11 +134,11 @@ export type WorkOpenTarget =
   | { fileId: string; kind: 'filePreview'; url?: string }
   | { canvasId: string; kind: 'canvas'; version?: number }
   /**
-   * Grid viewer of a gallery Work. Summary rows carry the version's images;
+   * Grid viewer of a collection Work. Summary rows carry the version's images;
    * list rows only know the cover, so the viewer loads the images itself when
    * `items` is missing.
    */
-  | { items?: GalleryWorkImage[]; kind: 'gallery'; title?: string | null; workId: string };
+  | { items?: CollectionWorkItem[]; kind: 'collection'; title?: string | null; workId: string };
 
 /**
  * Client-side allowlist for external Work URLs (defense in depth over the
@@ -258,38 +258,40 @@ const getFileWorkMetadata = (item: WorkItemOfType<'file'>): WorkVersionMetadata 
 const getFileWorkPath = (item: WorkItemOfType<'file'>): string | null =>
   getFileWorkMetadata(item)?.filePath ?? item.description?.trim() ?? null;
 
-/** The images of a gallery summary row; list rows carry no version metadata. */
-const getGalleryItems = (item: WorkItemOfType<'gallery'>): GalleryWorkImage[] | undefined =>
-  'event' in item ? (item.event?.metadata?.gallery?.items ?? undefined) : undefined;
+/** The images of a collection summary row; list rows carry no version metadata. */
+const getCollectionItems = (
+  item: WorkItemOfType<'collection'>,
+): CollectionWorkItem[] | undefined =>
+  'event' in item ? (item.event?.metadata?.collection?.items ?? undefined) : undefined;
 
 /**
- * The cover a gallery card shows: the version's named cover, else its first
+ * The cover a collection card shows: the version's named cover, else its first
  * image, else the denormalized `works.url` list rows carry. Only http(s) URLs.
  */
-export const getGalleryCoverUrl = (item: WorkItemOfType<'gallery'>): string | null => {
-  const gallery = 'event' in item ? item.event?.metadata?.gallery : undefined;
-  const cover = gallery?.coverFileId
-    ? gallery.items.find((image) => image.fileId === gallery.coverFileId)
+export const getCollectionCoverUrl = (item: WorkItemOfType<'collection'>): string | null => {
+  const collection = 'event' in item ? item.event?.metadata?.collection : undefined;
+  const cover = collection?.coverFileId
+    ? collection.items.find((image) => image.fileId === collection.coverFileId)
     : undefined;
-  const url = (cover ?? gallery?.items[0])?.url ?? item.url;
+  const url = (cover ?? collection?.items[0])?.url ?? item.url;
   return isSafeExternalUrl(url) ? url : null;
 };
 
 /**
- * Up to three images a gallery card fans out, cover first. Fewer than two means
+ * Up to three images a collection card fans out, cover first. Fewer than two means
  * there is nothing to fan: list rows know only the cover.
  */
-export const getGalleryFanUrls = (item: WorkItemOfType<'gallery'>): string[] => {
-  const cover = getGalleryCoverUrl(item);
-  const others = (getGalleryItems(item) ?? [])
+export const getCollectionFanUrls = (item: WorkItemOfType<'collection'>): string[] => {
+  const cover = getCollectionCoverUrl(item);
+  const others = (getCollectionItems(item) ?? [])
     .map((image) => image.url)
     .filter((url) => url !== cover && isSafeExternalUrl(url));
   return [...(cover ? [cover] : []), ...others].slice(0, 3);
 };
 
-/** Image count of a gallery summary row, `null` for list rows that do not know it. */
-export const getGalleryImageCount = (item: WorkItemOfType<'gallery'>): number | null =>
-  getGalleryItems(item)?.length ?? null;
+/** Image count of a collection summary row, `null` for list rows that do not know it. */
+export const getCollectionImageCount = (item: WorkItemOfType<'collection'>): number | null =>
+  getCollectionItems(item)?.length ?? null;
 
 export const WORK_TYPE_DESCRIPTORS: {
   [T in ListedWorkType]: WorkTypeDescriptor<WorkItemOfType<T>>;
@@ -404,13 +406,13 @@ export const WORK_TYPE_DESCRIPTORS: {
     getStateLabelKey: (item) => getGithubState(item)?.labelKey ?? null,
     getTitle: (item) => item.title,
   },
-  gallery: {
+  collection: {
     getDescription: (item) => item.description?.trim() ?? null,
     getIcon: () => ImagesIcon,
     getIdentifier: () => null,
     getOpenTarget: (item) => ({
-      items: getGalleryItems(item),
-      kind: 'gallery',
+      items: getCollectionItems(item),
+      kind: 'collection',
       title: item.title,
       workId: item.id,
     }),

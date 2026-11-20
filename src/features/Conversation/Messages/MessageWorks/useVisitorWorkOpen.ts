@@ -1,7 +1,7 @@
 import type { WorkSummaryItem } from '@lobechat/types';
 import { useCallback } from 'react';
 
-import { openGalleryModal } from '@/features/GalleryModal/loader';
+import { openCollectionModal } from '@/features/CollectionModal/loader';
 import { getWorkTypeDescriptor, isSafeExternalUrl } from '@/features/Work/descriptors';
 import { createShareVisitorDocumentModal } from '@/features/Work/ShareVisitorDocumentModal';
 import { useAppOrigin } from '@/hooks/useAppOrigin';
@@ -56,9 +56,9 @@ export const useVisitorWorkOpen = () => {
             window.open(target.url, '_blank', 'noopener,noreferrer');
           return;
         }
-        case 'gallery': {
+        case 'collection': {
           // A visitor cannot read the Work's versions, so only a row carrying its images opens.
-          if (target.items) void openGalleryModal({ items: target.items, title: target.title });
+          if (target.items) void openCollectionModal({ items: target.items, title: target.title });
           return;
         }
         default: {

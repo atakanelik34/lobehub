@@ -2,7 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import useSWR from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useGalleryImages } from './useGalleryImages';
+import { useCollectionItems } from './useCollectionItems';
 
 const { listVersions } = vi.hoisted(() => ({ listVersions: vi.fn() }));
 
@@ -13,14 +13,14 @@ vi.mock('@/libs/swr', () => ({
 
 const image = (n: number) => ({ fileId: `file-${n}`, url: `https://app.example.com/f/file-${n}` });
 
-describe('useGalleryImages', () => {
+describe('useCollectionItems', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('shows the images it is given without loading the versions', () => {
     const { result } = renderHook(() =>
-      useGalleryImages({ items: [image(1), image(2)], workId: 'work-1' }),
+      useCollectionItems({ items: [image(1), image(2)], workId: 'work-1' }),
     );
 
     expect(result.current).toMatchObject({ images: [image(1), image(2)], isLoading: false });
@@ -30,13 +30,13 @@ describe('useGalleryImages', () => {
   it('loads the images of the latest version for a list row', async () => {
     // Versions come newest first.
     listVersions.mockResolvedValue([
-      { metadata: { gallery: { items: [image(3)] } } },
-      { metadata: { gallery: { items: [image(1)] } } },
+      { metadata: { collection: { items: [image(3)] } } },
+      { metadata: { collection: { items: [image(1)] } } },
     ]);
 
-    const { result } = renderHook(() => useGalleryImages({ workId: 'work-gallery-latest' }));
+    const { result } = renderHook(() => useCollectionItems({ workId: 'work-collection-latest' }));
 
     await waitFor(() => expect(result.current.images).toEqual([image(3)]));
-    expect(listVersions).toHaveBeenCalledWith('work-gallery-latest');
+    expect(listVersions).toHaveBeenCalledWith('work-collection-latest');
   });
 });

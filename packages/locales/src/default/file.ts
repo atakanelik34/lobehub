@@ -605,7 +605,7 @@ export default {
   'work.type.canvas': 'Canvas',
   'work.type.document': 'Document',
   'work.type.file': 'File',
-  'work.type.gallery': 'Gallery',
+  'work.type.collection': 'Gallery',
   'work.type.githubIssue': 'GitHub Issue',
   'work.type.githubPullRequest': 'GitHub PR',
   'work.type.linearDocument': 'Linear Document',

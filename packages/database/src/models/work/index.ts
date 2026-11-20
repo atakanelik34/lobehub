@@ -169,7 +169,7 @@ export class WorkModel {
     userId: string;
   }): Promise<{ id: string } | null> => findFileWorkVersionByToolCall(this.ctx, params);
 
-  /** `lh work create` / `lobe-work`: register a file, link or gallery the agent produced. See {@link createAgentWork}. */
+  /** `lh work create` / `lobe-work`: register a file, link or collection the agent produced. See {@link createAgentWork}. */
   createAgentWork = (run: AgentWorkRunContext, input: CreateAgentWorkInput) =>
     createAgentWork(this.ctx, run, input);
 
