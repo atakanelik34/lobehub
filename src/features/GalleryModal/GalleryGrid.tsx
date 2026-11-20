@@ -13,8 +13,10 @@ const styles = stylex.create({
   },
   grid: {
     display: 'grid',
+    // Keep in step with GALLERY_GRID_GAP / GALLERY_TILE_SIZE in ./layout; StyleX needs literals.
     gap: 12,
-    gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+    // auto-fit collapses unused tracks, so fewer images than columns stretch to fill the row.
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
   },
   tile: {
     display: 'flex',
@@ -42,7 +44,9 @@ const GalleryGrid = ({ items }: GalleryGridProps) => (
             alt={item.caption ?? ''}
             objectFit={'cover'}
             src={item.url}
-            style={{ aspectRatio: 1 }}
+            // The ratio goes on the <img>: on the root it squares the frame while the
+            // image keeps its own height, leaving an empty strip under landscape shots.
+            styles={{ image: { aspectRatio: 1 } }}
             width={'100%'}
           />
           {item.caption && (

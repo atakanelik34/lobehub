@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import AsyncBoundary from '@/components/AsyncBoundary';
 
 import GalleryGrid from './GalleryGrid';
+import { getGalleryModalWidth } from './layout';
 import { useGalleryImages } from './useGalleryImages';
 
 export interface GalleryModalParams {
@@ -46,5 +47,5 @@ export const createGalleryModal = ({ items, title, workId }: GalleryModalParams)
     maskClosable: true,
     styles: { content: { maxHeight: '75vh', overflowY: 'auto' } },
     title: title?.trim() || t('workingPanel.works.galleryUntitled', { ns: 'chat' }),
-    width: 'min(95vw, 960px)',
+    width: getGalleryModalWidth(items?.length),
   });
