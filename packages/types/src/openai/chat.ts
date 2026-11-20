@@ -2,6 +2,17 @@ import type { LLMRoleType } from '../llm';
 import type { MessageToolCall, ModelReasoning } from '../message';
 import type { OpenAIFunctionCall } from './functionCall';
 
+/** A request-local projection of tool discoveries onto their original conversation positions. */
+export interface ToolActivationContext {
+  additions: { afterToolCallId: string; instructions: string; names: string[] }[];
+  /** Only context-engine-generated messages may be replaced. */
+  prefix?: { current: ToolPromptMessage[]; initial: ToolPromptMessage[] };
+}
+
+type ToolPromptMessage = { content: string; role: 'system' | 'user' };
+
+export type ResolveToolActivationContext = () => Promise<ToolActivationContext | undefined>;
+
 export type ChatResponseFormat =
   | { type: 'json_object' }
   | {

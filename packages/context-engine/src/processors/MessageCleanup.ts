@@ -7,6 +7,8 @@ declare module '../types' {
   interface PipelineContextMetadataOverrides {
     messageCleanup?: {
       cleanedCount: number;
+      /** Position of the generated first-user context before its internal marker is stripped. */
+      systemInjectionIndex?: number;
       totalMessages: number;
     };
   }
@@ -29,10 +31,13 @@ export class MessageCleanupProcessor extends BaseProcessor {
     const clonedContext = this.cloneContext(context);
 
     let cleanedCount = 0;
+    let systemInjectionIndex: number | undefined;
 
     // Clean each message, keeping only necessary fields
     for (let i = 0; i < clonedContext.messages.length; i++) {
       const message = clonedContext.messages[i];
+      if (message.role === 'user' && message.meta?.systemInjection === true)
+        systemInjectionIndex = i;
       const cleanedMessage = this.cleanMessage(message);
 
       if (cleanedMessage !== message) {
@@ -44,6 +49,7 @@ export class MessageCleanupProcessor extends BaseProcessor {
     // Update metadata
     clonedContext.metadata.messageCleanup = {
       cleanedCount,
+      ...(systemInjectionIndex !== undefined && { systemInjectionIndex }),
       totalMessages: clonedContext.messages.length,
     };
 
