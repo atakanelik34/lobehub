@@ -5,10 +5,11 @@ import type {
   UpdateAgentWorkInput,
   WorkDisplayField,
   WorkItem,
+  WorkVersionCumulativeUsage,
   WorkVersionMetadata,
 } from '@lobechat/types';
 import { AGENT_WORK_CLI_TOOL_IDENTIFIER, GALLERY_WORK_MAX_ITEMS } from '@lobechat/types';
-import { and, eq, exists } from 'drizzle-orm';
+import { and, eq, exists, inArray, isNull } from 'drizzle-orm';
 
 import { works, workVersions } from '../../schemas/work';
 import { idGenerator } from '../../utils/idGenerator';
@@ -56,6 +57,9 @@ const normalizeAgentLink = (value: string): string => {
   }
   return url.href;
 };
+
+/** Tool names of the versions `createWork` / `updateWork` write. */
+const AGENT_WORK_TOOL_NAMES = ['createWork', 'updateWork'];
 
 const provenanceOf = (run: AgentWorkRunContext, toolName: string) => ({
   agentId: run.agentId ?? null,
@@ -383,4 +387,39 @@ export const deleteAgentWork = async (
   // Versions go with the Work through the `work_versions.work_id` cascade.
   await ctx.db.delete(works).where(and(eq(works.id, work.id), eq(works.userId, run.userId)));
   return { id: work.id, title: work.title };
+};
+
+/**
+ * Give the run's agent-written Work versions the run's spend. `createWork` /
+ * `updateWork` write their version while the tool call runs, because the agent
+ * needs the Work id in the result, so the tool call's cost is not known yet and
+ * the version lands without one. Run completion calls this with the run total,
+ * the same figure the Works scanned at completion carry. Versions that already
+ * have a cost are left alone, so a retried completion changes nothing.
+ */
+export const fillAgentWorkCost = async (
+  ctx: WorkContext,
+  params: {
+    cumulativeCost: number | null;
+    cumulativeUsage: WorkVersionCumulativeUsage | null;
+    rootOperationId: string;
+  },
+): Promise<number> => {
+  if (params.cumulativeCost === null) return 0;
+  const updated = await ctx.db
+    .update(workVersions)
+    .set({ cumulativeCost: params.cumulativeCost, cumulativeUsage: params.cumulativeUsage })
+    .where(
+      and(
+        eq(workVersions.rootOperationId, params.rootOperationId),
+        isNull(workVersions.cumulativeCost),
+        inArray(workVersions.toolName, AGENT_WORK_TOOL_NAMES),
+        inArray(
+          workVersions.workId,
+          ctx.db.select({ id: works.id }).from(works).where(workOwnership(ctx)),
+        ),
+      ),
+    )
+    .returning({ id: workVersions.id });
+  return updated.length;
 };

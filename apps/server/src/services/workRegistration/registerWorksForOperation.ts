@@ -423,6 +423,18 @@ export const registerWorksForOperation = async (
       }
     : null;
 
+  // Works the agent wrote itself (`lobe-work` / `lh work`) were saved mid-run
+  // without a cost; give them the same run total the Works below carry.
+  try {
+    await workModel.fillAgentWorkCost({
+      cumulativeCost,
+      cumulativeUsage,
+      rootOperationId: operationId,
+    });
+  } catch (error) {
+    log('[%s] Failed to fill agent Work cost (non-fatal): %O', operationId, error);
+  }
+
   // Recover external Works (github issue/PR today) from hetero / device shell
   // records (codex, claude-code, lobe-local-system) — these surfaces never pass
   // the skill-tool registration hook. Self-guarded: per-record failures are

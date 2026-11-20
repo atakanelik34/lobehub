@@ -23,7 +23,7 @@ import debug from 'debug';
 
 import type { LobeChatDatabase } from '../../type';
 import { ScmChangeRequestModel } from '../scm';
-import { createAgentWork, deleteAgentWork, updateAgentWork } from './agentWork';
+import { createAgentWork, deleteAgentWork, fillAgentWorkCost, updateAgentWork } from './agentWork';
 import {
   findCanvasIdByWorkId,
   findCanvasIdsByDeploymentIds,
@@ -180,6 +180,10 @@ export class WorkModel {
   /** `lh work delete`: remove a Work the agent created by mistake. See {@link deleteAgentWork}. */
   deleteAgentWork = (run: AgentWorkRunContext, workId: string) =>
     deleteAgentWork(this.ctx, run, workId);
+
+  /** Run completion: give the run's agent-written versions its spend. See {@link fillAgentWorkCost}. */
+  fillAgentWorkCost = (params: Parameters<typeof fillAgentWorkCost>[1]) =>
+    fillAgentWorkCost(this.ctx, params);
 
   handleSkillToolResult = async (
     params: RegisterSkillToolResultWorkParams,

@@ -258,4 +258,43 @@ describe('WorkModel · deleting agent Works', () => {
     );
     expect(await serverDB.select().from(works).where(eq(works.id, gallery.id))).toHaveLength(1);
   });
+
+  it("gives the run's agent-written versions the run total once the run ends", async () => {
+    const gallery = await createGallery();
+    await workModel().updateAgentWork(
+      { ...run, toolCallId: 'call-gallery-2' },
+      { title: 'Renamed shelf', workId: gallery.id },
+    );
+    const scanned = await workModel().registerFile({
+      cumulativeCost: 0.01,
+      filePath: '/mnt/data/deck.pptx',
+      metadata: { fileId: 'file-deck', filePath: '/mnt/data/deck.pptx' },
+      rootOperationId: 'op-gallery',
+      title: 'deck.pptx',
+      toolCallId: 'op:op-gallery',
+      toolIdentifier: 'lobe-cloud-sandbox',
+      toolName: 'writeFile',
+      topicId,
+      userId,
+    });
+
+    const fill = () =>
+      workModel().fillAgentWorkCost({
+        cumulativeCost: 0.25,
+        cumulativeUsage: null,
+        rootOperationId: 'op-gallery',
+      });
+    expect(await fill()).toBe(2);
+    // A retried completion changes nothing.
+    expect(await fill()).toBe(0);
+
+    const costs = await serverDB
+      .select({ cost: workVersions.cumulativeCost, workId: workVersions.workId })
+      .from(workVersions);
+    expect(costs.filter((row) => row.workId === gallery.id).map((row) => row.cost)).toEqual([
+      0.25, 0.25,
+    ]);
+    // A Work that already carries its own cost keeps it.
+    expect(costs.find((row) => row.workId === scanned!.id)?.cost).toBe(0.01);
+  });
 });
