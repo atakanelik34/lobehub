@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { getGalleryCoverUrl, getGalleryImageCount, getWorkTypeDescriptor } from './descriptors';
+import {
+  getGalleryCoverUrl,
+  getGalleryFanUrls,
+  getGalleryImageCount,
+  getWorkTypeDescriptor,
+} from './descriptors';
 
 describe('getWorkTypeDescriptor', () => {
   it('returns a usable fallback descriptor for an unknown work type', () => {
@@ -180,6 +185,20 @@ describe('getWorkTypeDescriptor', () => {
 
       const unsafe = { ...listRow, url: 'javascript:alert(1)' } as any;
       expect(getGalleryCoverUrl(unsafe)).toBeNull();
+    });
+
+    it('fans out up to three images with the cover in front', () => {
+      const four = {
+        ...summaryRow,
+        event: {
+          metadata: {
+            gallery: { coverFileId: 'file-3', items: [image(1), image(2), image(3), image(4)] },
+          },
+        },
+      } as any;
+      expect(getGalleryFanUrls(four)).toEqual([image(3).url, image(1).url, image(2).url]);
+      // A list row knows only the cover, so there is nothing to fan.
+      expect(getGalleryFanUrls(listRow as any)).toEqual(['https://app.example.com/f/file-2']);
     });
   });
 

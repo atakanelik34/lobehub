@@ -18,11 +18,13 @@ import { formatWorkVersionCost } from '@/utils/workVersionCost';
 import CanvasWorkCard from './CanvasWorkCard';
 import {
   getGalleryCoverUrl,
+  getGalleryFanUrls,
   getGalleryImageCount,
   getWorkTypeDescriptor,
   type WorkBranch,
   type WorkIcon,
 } from './descriptors';
+import GalleryFan from './GalleryFan';
 import { openExternalWork } from './openExternalWork';
 import { useResourceDeletedPrompt } from './useResourceDeletedPrompt';
 
@@ -348,6 +350,8 @@ const WorkSummaryCard = memo<WorkSummaryCardProps>(
     // A gallery shows its cover in place of the icon and its image count in the identifier slot.
     const coverUrl = item.type === 'gallery' ? getGalleryCoverUrl(item) : null;
     const imageCount = item.type === 'gallery' ? getGalleryImageCount(item) : null;
+    // The card fans a multi-image gallery so it reads as a set; smaller rows keep the cover alone.
+    const fanUrls = item.type === 'gallery' ? getGalleryFanUrls(item) : [];
     const metaIdentifier =
       imageCount !== null
         ? t('workingPanel.works.galleryCount', { count: imageCount })
@@ -499,13 +503,17 @@ const WorkSummaryCard = memo<WorkSummaryCardProps>(
         gap={12}
         onClick={clickable ? handleOpen : undefined}
       >
-        <Flexbox align={'center'} className={styles.icon} justify={'center'} title={stateLabel}>
-          {coverUrl ? (
-            <img alt="" className={styles.coverFill} src={coverUrl} />
-          ) : (
-            <Icon size={18} />
-          )}
-        </Flexbox>
+        {fanUrls.length > 1 ? (
+          <GalleryFan urls={fanUrls} />
+        ) : (
+          <Flexbox align={'center'} className={styles.icon} justify={'center'} title={stateLabel}>
+            {coverUrl ? (
+              <img alt="" className={styles.coverFill} src={coverUrl} />
+            ) : (
+              <Icon size={18} />
+            )}
+          </Flexbox>
+        )}
         <Flexbox flex={1} gap={2} style={{ minWidth: 0 }}>
           <Flexbox horizontal align={'center'} gap={8} style={{ minWidth: 0 }}>
             <Text ellipsis className={styles.title} style={{ flex: 1 }} title={title}>

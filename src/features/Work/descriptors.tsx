@@ -275,6 +275,18 @@ export const getGalleryCoverUrl = (item: WorkItemOfType<'gallery'>): string | nu
   return isSafeExternalUrl(url) ? url : null;
 };
 
+/**
+ * Up to three images a gallery card fans out, cover first. Fewer than two means
+ * there is nothing to fan: list rows know only the cover.
+ */
+export const getGalleryFanUrls = (item: WorkItemOfType<'gallery'>): string[] => {
+  const cover = getGalleryCoverUrl(item);
+  const others = (getGalleryItems(item) ?? [])
+    .map((image) => image.url)
+    .filter((url) => url !== cover && isSafeExternalUrl(url));
+  return [...(cover ? [cover] : []), ...others].slice(0, 3);
+};
+
 /** Image count of a gallery summary row, `null` for list rows that do not know it. */
 export const getGalleryImageCount = (item: WorkItemOfType<'gallery'>): number | null =>
   getGalleryItems(item)?.length ?? null;
